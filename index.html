@@ -571,7 +571,7 @@
   async function refreshLatest(){
     try{
       const key = await ensureKey();
-      const d = await postJSON(API_LIST, {current:1, pageSize:100}, {'access-key':key});
+      const d = await postJSON(API_LIST, {current:1, pageSize:50}, {'access-key':key});
       if(d.code !== 200) return;
       (d.data.list || []).forEach(noteAcct);
       saveAcctLast();
@@ -1153,12 +1153,14 @@
 
   async function fetchAllMessages(infoEl, scope, limit){
     const key = await ensureKey();
-    const ps = 100;
+    const ps = 50;   // 接口单页上限就是 50（即使请求 100 也只返回 50），页数必须按 50 计算才拉得全
     const cap = Math.min(limit || state.total, state.total);
-    const pages = Math.max(1, Math.ceil(cap / ps));
+    let pages = Math.max(1, Math.ceil(cap / ps));
     const fetchPage = async p => {
       const d = await postJSON(API_LIST, {current:p, pageSize:ps}, {'access-key':key});
       if(d.code !== 200) throw new Error('拉取列表失败：' + (d.msg||d.code) + ' ' + hintOf(d.code));
+      // 以服务端返回的 pages 为准，防止客户端算少导致漏拉
+      if(d.data && d.data.pages) pages = Math.max(1, Math.min(pages, d.data.pages));
       return d.data.list || [];
     };
     const cached = (state.full && state.fullScope === scope) ? state.full : null;
@@ -1178,15 +1180,15 @@
         if(list.length < ps) break;
         p++;
       }
-      if(!fresh.length){
-        setStatus(infoEl, `复用已读列表 ${cached.length} 条，无新推送`, 'ok');
-        return cached.slice(0, cap);
-      }
-
       const merged = [], used = new Set();
       fresh.concat(cached).forEach(m => {
         if(m.shortCode && !used.has(m.shortCode)){ used.add(m.shortCode); merged.push(m); }
       });
+      // 缓存条数够本范围且无新推送 → 直接复用，不再补拉
+      if(!fresh.length && merged.length >= cap){
+        setStatus(infoEl, `复用已读列表 ${merged.length} 条，无新推送`, 'ok');
+        return merged.slice(0, cap);
+      }
       // 范围比已读条数更大时，顺延补拉更旧的页（加轮次上限，避免整页重复导致死循环）
       let guard = 0;
       while(merged.length < cap && guard++ <= pages + 1){
@@ -1248,16 +1250,13 @@
     $('dRun').disabled = true; $('dMd').disabled = true;
     $('dProg').style.width = '0';
     try{
-      const all = await fetchAllMessages(infoEl, scope, scope === 'all' ? state.total : Number(scope));
-      // 超过保留天数的旧推送已在清理时移除，不再重复读取
-      const cutoff = Date.now() - store.keepDays() * 86400000;
-      const msgs = all.filter(m => !isFilteredMsg(m)).filter(m => {
-        const ts = parseTs(m.updateTime);
-        return isNaN(ts) || ts >= cutoff;
-      });
-      const skippedHead = all.length - msgs.length;
+      const cap = scope === 'all' ? state.total : Number(scope);
+      // 多取一条（实际会多取到一页）作为「范围之前」的基准消息，让范围内最早一条能算出真实盈亏
+      const all = await fetchAllMessages(infoEl, scope, cap < state.total ? cap + 1 : cap);
+      const baseCodes = new Set(all.slice(cap).map(m => m.shortCode));   // 仅作基准，不参与统计
+      const msgs = all.filter(m => baseCodes.has(m.shortCode) || !isFilteredMsg(m));
       if(!all.length) throw new Error('没有可统计的消息');
-      if(!msgs.length) throw new Error('没有可统计的消息（异常/宝箱或超出保留天数已排除）');
+      if(!msgs.length) throw new Error('没有可统计的消息（异常/宝箱已排除）');
       const n = msgs.length;
       const results = new Array(n);
       let done = 0, idx = 0, lastPaint = 0;
@@ -1294,9 +1293,20 @@
       paint(true);
       store.save();   // 新解析的推送写入本地存档
 
-      const used = results.filter(r => r && r.keep);
-      const skipped = skippedHead + (results.length - used.length);
+      const used = results.filter(r => r && r.keep && !baseCodes.has(r.m.shortCode));
+      const counted = all.length - baseCodes.size;          // 范围内实际参与统计的消息条数
+      const skipped = counted - used.length;                // 排除条数：异常/宝箱 + 非种树完成，两者不重叠
+      const fetched = counted;
       if(!used.length) throw new Error('没有匹配「种树完成」的消息');
+      // 基准：范围内每个账号「最靠近范围起点的那条更旧消息」，用于给最早一条提供上一笔累计/种植数
+      const base = new Map();
+      results.forEach(r => {
+        if(!r || !r.keep || !baseCodes.has(r.m.shortCode) || r.cum == null) return;
+        const name = r.acct || '未识别';
+        const t = r.m.updateTime || '';
+        const cur = base.get(name);
+        if(!cur || t >= cur.t) base.set(name, {t, cum: r.cum, plant: r.plant});
+      });
       const accts = new Map();
       used.forEach(r => {
         if(!r) return;
@@ -1321,7 +1331,9 @@
         const days = [...a.days.values()].sort((x,y) => x.date < y.date ? -1 : (x.date > y.date ? 1 : 0));
         // 每条推送的盈亏 = 本条「累计收益」 − 上一条「累计收益」；当日收益 = 当天各条盈亏之和
         // 当日种植数量同理：本条「已种植」 − 上一条「已种植」，按天求和（首条没有上一条，记 0）
-        let prevCum = null, prevPlant = null;
+        // 若范围内最早一条之前还有更旧推送（基准），先用它的累计/种植数做上一笔，避免首条被记成 0
+        const bb = base.get(a.name);
+        let prevCum = bb ? bb.cum : null, prevPlant = bb && bb.plant != null ? bb.plant : null;
         days.forEach(d => d.msgs.sort((x,y) => x.t < y.t ? -1 : (x.t > y.t ? 1 : 0)));
         days.forEach(d => d.msgs.forEach(m => {
           m.earn = (m.cum != null && prevCum != null) ? (m.cum - prevCum) : 0;
@@ -1344,7 +1356,7 @@
       state.daily = {accounts, filter:'all', skipped};
       renderDailyResult();
       $('dMd').disabled = false;
-      setStatus(infoEl, `完成：${accounts.length} 个账号 / ${used.length} 条种树完成（明细 ${n} 条，已过滤 ${skipped} 条）`, 'ok');
+      setStatus(infoEl, `完成：${accounts.length} 个账号 / ${used.length} 条种树完成（共统计 ${fetched} 条，排除 ${skipped} 条）`, 'ok');
     }catch(err){
       setStatus(infoEl, '统计失败：' + err.message, 'err');
     }finally{
@@ -1375,7 +1387,7 @@
     h += `<h3>每日汇总（所有账号）<span class="sub">共 ${dayList.length} 天</span></h3>`;
     h += '<table class="tbl"><tr><th>日期</th><th class="num">种植数量</th><th class="num">当日种植</th><th class="num key">当日收益</th><th class="num">平均收益</th></tr>' +
       dayList.map(d => `<tr><td>${esc(d.date)}</td><td class="num">${d.plant} 棵</td><td class="num">${d.grow} 棵</td><td class="num key">${fmtC(d.earn)}</td><td class="num">${fmtC(avgPush(d))}</td></tr>`).join('') +
-      `<tr class="hl"><td>合计（${dayList.length} 天）</td><td class="num">${total.plant} 棵</td><td class="num">${total.grow} 棵</td><td class="num key">${fmtC(total.dayEarn)}</td><td class="num">${fmtC(avgPush(total))}</td></tr></table>`;
+      `<tr class="hl"><td>合计（${dayList.length} 天）</td><td class="num">${(dayList.length ? dayList[dayList.length-1].plant : total.plant)} 棵</td><td class="num">${total.grow} 棵</td><td class="num key">${fmtC(total.dayEarn)}</td><td class="num">${fmtC(avgPush(total))}</td></tr></table>`;
 
     // 每个账号的每日明细
     const show = sel === 'all' ? accounts : accounts.filter(a => a.name === sel);
@@ -1394,7 +1406,7 @@
         rows.push(`<tr><td>${esc(d.date)}</td><td>${esc(m.t)}</td><td class="num">${m.cum == null ? '—' : fmtC(m.cum)}</td><td class="num">${fmtC(m.earn)}</td><td class="num key">${fmtC(d.earn)}</td></tr>`);
       }));
       h += rows.join('');
-      h += `<tr class="hl"><td>合计</td><td>${a.count} 条</td><td class="num">${fmtC(a.lastCum)}</td><td class="num">${fmtC(a.dayEarn)}</td><td class="num key">${fmtC(a.dayEarn)}</td></tr></table>`;
+      h += `<tr class="hl"><td>合计</td><td>${a.count} 条</td><td class="num">${fmtC(a.lastCum)}</td><td class="num">${fmtC(a.dayEarn)}</td><td class="num key">${fmtC(a.latestEarn)}</td></tr></table>`;
     });
 
     const skipped = (state.daily && state.daily.skipped) || 0;
