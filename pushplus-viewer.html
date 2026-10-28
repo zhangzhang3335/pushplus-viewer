@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PUSHplus 收益统计</title>
+<style>
+  :root{
+    --bg:#0b111c; --panel:#151b28; --panel2:#1d2536; --line:#2a3448;
+    --txt:#e6ebf5; --sub:#93a0b8; --acc:#3b82f6; --acc2:#60a5fa;
+    --ok:#22c55e; --err:#ef4444; --warn:#f59e0b; --gold:#ffd479;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.65 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--txt);overflow:hidden;
+    background:
+      radial-gradient(1200px 600px at 12% -10%, rgba(59,130,246,.10), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(34,197,94,.06), transparent 55%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(59,130,246,.35)}
+  *::-webkit-scrollbar{width:10px;height:10px}
+  *::-webkit-scrollbar-thumb{background:#2a3448;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+  *::-webkit-scrollbar-thumb:hover{background:#3a4a6e;background-clip:content-box}
+  *::-webkit-scrollbar-track{background:transparent}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);
+    padding:6px 13px;border-radius:8px;transition:background .15s,border-color .15s,transform .05s}
+  button:hover{border-color:var(--acc);background:#243047}
+  button:active{transform:translateY(1px)}
+  button.primary{background:linear-gradient(180deg,#4c8dfb,#2f6fe0);border-color:#3b7ff0;color:#fff;box-shadow:0 2px 10px rgba(59,130,246,.35)}
+  button.primary:hover{background:linear-gradient(180deg,#5c99ff,#3a7bf0)}
+  button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+  input{font:inherit;background:#0e1522;border:1px solid var(--line);color:var(--txt);padding:7px 11px;border-radius:8px;width:100%;
+    transition:border-color .15s,box-shadow .15s}
+  input:focus,select:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+  select{font:inherit;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 8px;cursor:pointer}
+  :focus-visible{outline:2px solid rgba(59,130,246,.5);outline-offset:2px}
+  header{display:flex;align-items:center;gap:12px;height:56px;padding:0 18px;border-bottom:1px solid var(--line);
+    background:rgba(21,27,40,.86);backdrop-filter:blur(12px);position:sticky;top:0;z-index:30}
+  header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.3px;display:flex;align-items:center;gap:9px}
+  header h1::before{content:"";width:9px;height:9px;border-radius:3px;background:linear-gradient(160deg,var(--acc2),var(--ok));box-shadow:0 0 12px rgba(96,165,250,.55)}
+  header .sp{flex:1}
+  header .who{color:var(--sub);font-size:12px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.03)}
+  .wrap{display:grid;grid-template-columns:372px 1fr;overflow:hidden;
+    height:calc(100vh - 56px);height:calc(100dvh - 56px)}
+  .left{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:rgba(15,21,32,.55)}
+  .right{display:flex;flex-direction:column;min-height:0}
+  .bar{display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .list{overflow:auto;flex:1;padding:4px 0}
+  .msg{padding:11px 14px;border-bottom:1px solid rgba(42,52,72,.6);border-left:3px solid transparent;cursor:pointer;
+    transition:background .15s,border-color .15s}
+  .msg:hover{background:rgba(30,38,55,.72)}
+  .msg.active{background:linear-gradient(90deg,rgba(59,130,246,.16),rgba(59,130,246,.03));border-left-color:var(--acc)}
+  .msg .t{font-weight:600;margin-bottom:2px;word-break:break-all;font-size:14px;line-height:1.45}
+  .msg .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:middle;
+    box-shadow:0 0 8px rgba(34,197,94,.8)}
+  .msg .m{font-size:12px;color:var(--sub);display:flex;gap:10px;flex-wrap:wrap}
+  .msg .metaline{font-size:12px;color:var(--sub);margin-top:6px;font-variant-numeric:tabular-nums;
+    display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+  .msg .metaline b{font-weight:600;color:#dbe6ff}
+  .msg .metaline .key{color:var(--gold)}
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:1px 9px;border-radius:999px;line-height:1.7;
+    background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07)}
+  .pager{display:flex;gap:10px;align-items:center;justify-content:center;padding:9px;border-top:1px solid var(--line);
+    font-size:12px;color:var(--sub);background:rgba(21,27,40,.9)}
+  .pager button{padding:4px 12px;font-size:12px;border-radius:7px}
+  .pane{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto;scroll-behavior:smooth}
+  .bar.top{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;
+    background:rgba(21,27,40,.55);position:sticky;top:0;z-index:10;backdrop-filter:blur(8px)}
+  .bar.top .title{color:var(--txt);font-size:13px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bigcard{margin:18px;padding:26px;background:linear-gradient(165deg,#202a3d,#161d2c);border:1px solid var(--line);
+    border-radius:14px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .bigcard::after{content:"";position:absolute;left:0;top:0;width:100%;height:2px;
+    background:linear-gradient(90deg,var(--acc),rgba(34,197,94,.7),transparent 80%)}
+  .bigcard .cap{font-size:12px;color:var(--sub);letter-spacing:.6px}
+  .bigcard b{display:block;margin:8px 0 10px;font-size:40px;line-height:1.1;color:var(--ok);
+    font-variant-numeric:tabular-nums;text-shadow:0 2px 20px rgba(34,197,94,.25)}
+  .bigcard .meta{font-size:12px;color:var(--sub);word-break:break-all;display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:4px}
+  pre{margin:0;padding:16px;white-space:pre-wrap;word-break:break-word;font:13px/1.75 Consolas,"Courier New",monospace;
+    color:#cfe3ff;background:#0d1421;border:1px solid var(--line);border-radius:10px}
+  iframe{width:100%;flex:1;border:0;background:#fff}
+  .empty{display:flex;align-items:center;justify-content:center;flex:1;color:var(--sub);text-align:center;padding:24px}
+  .status{padding:7px 14px;font-size:12px;border-top:1px solid var(--line);color:var(--sub)}
+  .status.ok{color:var(--ok)} .status.err{color:var(--err)} .status.warn{color:var(--warn)}
+  .cfg{padding:16px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  .cfg h2{margin:0 0 10px;font-size:14px}
+  .cfg .row{margin-bottom:10px}
+  .cfg label{display:block;font-size:12px;color:var(--sub);margin-bottom:4px}
+  .cfg .hint{font-size:12px;color:var(--sub);margin-top:10px;line-height:1.75}
+  .cfg .hint code{background:#0e1522;padding:1px 6px;border-radius:5px;color:var(--gold)}
+  .row-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .hide{display:none}
+  .daily{padding:18px 20px}
+  .daily .opts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;
+    background:rgba(30,38,55,.6);border:1px solid var(--line);border-radius:12px}
+  .daily .opts select{width:auto;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+  .daily .opts button{padding:6px 14px}
+  .daily .acctbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+  .daily .acctbar select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+  .daily h3{font-size:14px;margin:22px 0 8px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .daily h3::before{content:"";width:3px;height:14px;border-radius:2px;background:linear-gradient(180deg,var(--acc),var(--ok))}
+  .daily h3 .sub{font-size:12px;color:var(--sub);font-weight:400;margin-left:2px}
+  table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+  table.tbl th{text-align:left;font-size:12px;color:var(--sub);padding:8px;border-bottom:1px solid var(--line);font-weight:600;
+    position:sticky;top:0;background:rgba(15,21,32,.96);backdrop-filter:blur(6px);z-index:2;white-space:nowrap}
+  table.tbl td{padding:8px;border-bottom:1px solid rgba(42,52,72,.55);font-variant-numeric:tabular-nums}
+  table.tbl tr:hover td{background:rgba(59,130,246,.06)}
+  table.tbl th.num,table.tbl td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  table.tbl th.key{color:var(--gold);font-weight:700}
+  table.tbl td.key{font-weight:700;font-size:15px}
+  .dialog .names{display:block;margin-top:6px;color:var(--warn);font-size:14px;word-break:break-all}
+  table.tbl tr.hl td{color:var(--gold);font-weight:600}
+  .total{margin-top:18px;padding:16px 18px;background:linear-gradient(165deg,#202a3d,#161d2c);border:1px solid var(--line);border-radius:12px}
+  .total .row{display:flex;justify-content:space-between;padding:4px 0;color:#c4d0e6}
+  .total .big{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline}
+  .total .big b{font-size:26px;color:var(--ok);font-variant-numeric:tabular-nums;text-shadow:0 2px 18px rgba(34,197,94,.22)}
+  .prog{height:6px;background:#0e1522;border:1px solid rgba(42,52,72,.6);border-radius:999px;overflow:hidden;margin:12px 0}
+  .prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--ok));transition:width .25s}
+  a{color:var(--acc)}
+  .pos{color:#3fb950}
+  .neg{color:#f85149}
+  .bar.auto{gap:6px;font-size:12px;color:var(--sub);flex-wrap:wrap;border-bottom:1px solid var(--line)}
+  .bar.auto select{width:auto;font:inherit;font-size:12px;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+  .bar.auto .hint-inline{color:var(--warn)}
+  .mask{position:fixed;inset:0;background:rgba(5,9,16,.62);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:99;padding:20px}
+  .mask.hide{display:none}
+  .dialog{background:linear-gradient(170deg,#1d2536,#151b28);border:1px solid var(--line);border-radius:14px;padding:22px 24px;max-width:460px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+  .dialog h3{margin:0 0 10px;font-size:15px;color:var(--warn)}
+  .dialog p{margin:0 0 16px;font-size:13px;line-height:1.7;color:var(--txt);word-break:break-all}
+  .dialog .acts{text-align:right}
+  .dialog.shake{max-width:500px;width:auto}
+  .dialog.shake h3{color:var(--warn)}
+  .dialog.shake.token{max-width:520px;border-color:#e6b34a;box-shadow:0 0 0 1px rgba(230,179,74,.55),0 0 34px rgba(230,179,74,.28),0 18px 60px rgba(0,0,0,.6);animation:tkPulse 1.8s ease-in-out infinite}
+  .dialog.shake.token h3{color:#ffd479;font-size:17px}
+  .dialog.shake .tk{display:flex;justify-content:center;margin:4px 0 12px;filter:drop-shadow(0 0 14px rgba(255,196,74,.55))}
+  .dialog.shake .tk-tip{font-size:13px;line-height:1.7;color:var(--txt);margin-bottom:8px}
+  .dialog.shake .tk-tip b{color:#ffd479}
+  .dialog.shake table.tbl{margin-top:6px}
+  @keyframes tkPulse{0%,100%{box-shadow:0 0 0 1px rgba(230,179,74,.55),0 0 26px rgba(230,179,74,.22),0 18px 60px rgba(0,0,0,.6)}50%{box-shadow:0 0 0 2px rgba(230,179,74,.85),0 0 44px rgba(230,179,74,.45),0 18px 60px rgba(0,0,0,.6)}}
+  /* 响应式：窄屏收窄侧栏，手机竖屏上下堆叠 */
+  @media (max-width:1180px){ .wrap{grid-template-columns:330px 1fr} }
+  @media (max-width:860px){
+    body{overflow:auto}
+    .wrap{grid-template-columns:1fr;height:auto;overflow:visible}
+    .left{border-right:0;border-bottom:1px solid var(--line)}
+    .list{max-height:46vh}
+    .pane{overflow:visible}
+    .bar.top{position:static}
+    header{position:static}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PUSHplus 收益统计</h1>
+  <span id="who" class="who"></span>
+  <span class="sp"></span>
+  <button id="btnCfg">设置</button>
+  <button id="btnDaily" disabled>按日期累计</button>
+  <button id="btnRefresh" class="primary" disabled>刷新</button>
+</header>
+
+<div class="wrap">
+  <div class="left">
+    <div id="cfg" class="cfg hide">
+      <h2>接入设置</h2>
+      <div class="row">
+        <label>用户 Token</label>
+        <input id="token" type="text" placeholder="pushplus 用户 token（不是消息 token）">
+      </div>
+      <div class="row">
+        <label>secretKey（用户密钥）</label>
+        <input id="secret" type="password" placeholder="开发设置里配置的 secretKey">
+      </div>
+      <div class="row row-inline">
+        <button id="btnSave" class="primary">保存并连接</button>
+        <button id="btnClear">清空</button>
+        <button id="btnIp">检测我的公网 IP</button>
+      </div>
+      <div class="hint">
+        前置条件（在 pushplus 官网操作一次即可）：<br>
+        1. 打开「开发设置」，启用<strong>开放接口</strong>；<br>
+        2. 配置 <code>secretKey</code>；<br>
+        3. 把本机<strong>公网 IP</strong> 加入「安全 IP 列表」，否则会返回 403；<br>
+        4. Token 与 secretKey 只保存在本机浏览器（localStorage），不会上传到其它服务器。
+      </div>
+      <div id="cfgStatus" class="status"></div>
+    </div>
+
+    <div class="bar">
+      <input id="kw" type="search" placeholder="按标题筛选…" style="flex:1;min-width:120px">
+      <select id="size" title="每页条数" style="width:auto;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px">
+        <option value="20" selected>20/页</option>
+        <option value="50">50/页</option>
+      </select>
+    </div>
+    <div class="bar auto">
+      <span>自动读取</span>
+      <select id="autoSec" title="自动读取新消息的时间间隔">
+        <option value="0">关闭</option>
+        <option value="60">1 分钟</option>
+        <option value="300">5 分钟</option>
+        <option value="600">10 分钟</option>
+        <option value="1800">30 分钟</option>
+      </select>
+      <span>无推送提醒</span>
+      <select id="alertMin" title="超过该时长没有新推送时弹窗提醒">
+        <option value="0">关闭</option>
+        <option value="30">30 分钟</option>
+        <option value="60">1 小时</option>
+        <option value="120">2 小时</option>
+        <option value="240">4 小时</option>
+      </select>
+      <input id="alertCustom" type="number" min="0" max="1440" step="5" placeholder="自定义分钟"
+        title="手动输入超时分钟数，填写后优先于左侧选项" style="width:96px">
+      <span>保留</span>
+      <input id="keepDays" type="number" min="1" max="90" step="1" value="7"
+        title="本地存档保留天数，过期自动清理" style="width:56px">
+      <span>天</span>
+      <span id="autoHint" class="hint-inline"></span>
+    </div>
+    <div id="list" class="list"></div>
+    <div class="pager">
+      <button id="prev">上一页</button>
+      <span id="pageInfo">-</span>
+      <button id="next">下一页</button>
+    </div>
+    <div id="listStatus" class="status"></div>
+  </div>
+
+  <div class="right">
+    <div class="bar top">
+      <span id="detailTitle" class="title">未选择消息</span>
+      <button id="btnRaw" disabled>查看原文</button>
+      <button id="btnCopySum" disabled>复制收益</button>
+    </div>
+    <div class="pane" id="pane">
+      <div class="empty">左侧选择一条推送消息</div>
+    </div>
+    <div id="detailStatus" class="status"></div>
+  </div>
+</div>
+
+<div id="warnMask" class="mask hide">
+  <div class="dialog">
+    <h3 id="warnTitle">推送超时提醒</h3>
+    <p id="warnMsg"></p>
+    <div class="acts"><button id="warnOk" class="primary">知道了</button></div>
+  </div>
+</div>
+
+<div id="shakeMask" class="mask hide">
+  <div id="shakeDlg" class="dialog shake">
+    <h3 id="shakeTitle">摇晃次数提醒</h3>
+    <div id="shakeMsg"></div>
+    <div class="acts"><button id="shakeOk" class="primary">知道了</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const API_KEY   = 'https://www.pushplus.plus/api/common/openApi/getAccessKey';
+  const API_LIST  = 'https://www.pushplus.plus/api/open/message/list';
+  const API_SHORT = 'https://www.pushplus.plus/shortMessage/';
+  // 牢牢记住页面加载时的原生 fetch：浏览器插件/控制台一旦改写 window.fetch，
+  // 直接调用 window.fetch 可能层层包裹导致栈溢出（Maximum call stack size exceeded）
+  const netFetch = window.fetch.bind(window);
+
+  const $ = id => document.getElementById(id);
+  const state = {
+    token:'', secret:'', accessKey:'', keyExp:0,
+    page:1, size:20, total:0, pages:0,
+    list:[], kw:'', sel:null, view:'detail', showRaw:false,
+    rawHtml:'', plainText:'', daily:null, detailCache:new Map(),
+    seenCodes:new Set(), freshCodes:new Set(), listReady:false, dAuto:0, acctLast:new Map(),
+    alerted:new Map(), full:null, fullScope:'',   // alerted: 已提醒过的「账号→推送时间」
+    shakeAlerted:new Set()                        // 已提醒过的摇晃次数消息 shortCode
+  };
+
+  /* ---------- 配置 ---------- */
+  function loadCfg(){
+    try{
+      state.token  = localStorage.getItem('pp_token')  || '';
+      state.secret = localStorage.getItem('pp_secret') || '';
+    }catch(e){}
+    $('token').value = state.token;
+    $('secret').value = state.secret;
+  }
+  function saveCfg(){
+    try{
+      localStorage.setItem('pp_token', state.token);
+      localStorage.setItem('pp_secret', state.secret);
+    }catch(e){}
+  }
+  function setStatus(el, msg, cls){
+    el.textContent = msg || '';
+    el.className = 'status' + (cls ? ' ' + cls : '');
+  }
+  function esc(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function toNum(s){
+    const t = String(s).replace(/[−–—]/g, '-').replace(/[,，\s]/g, '');
+    const n = Number(t);
+    return isNaN(n) ? 0 : n;
+  }
+  // 数值(元) → 万，保留2位小数并去掉末尾多余的 0（52.00 → 52，7.74 → 7.74）
+  const num2 = n => {
+    const v = Number(n);
+    if(!isFinite(v)) return '0';
+    let s = (v / 10000).toFixed(2).replace(/\.?0+$/, '');
+    return s === '-0' ? '0' : s;
+  };
+  const fmt = n => num2(n) + '万';
+  const signCls = n => (Number(n) < 0 ? 'neg' : 'pos');          // 负=红，正=绿
+  const fmtC = n => '<span class="' + signCls(n) + '">' + fmt(n) + '</span>';
+  // 平均收益 = 推送原文的「累计收益」÷「已种植」；优先用显示口径的种植数量(plant)，退回最新值(lastPlant)
+  const avgPush = x => { if(!x) return 0; const p = (x.plant > 0 ? x.plant : x.lastPlant); return p > 0 ? x.lastCum / p : 0; };
+  // 把各账号的「日期」明细合并成「每天所有账号」汇总（按日期升序，并累加当日收益/当日种植）
+  function mergeDays(accounts){
+    const map = new Map();
+    accounts.forEach(a => a.days.forEach(d => {
+      const t = map.get(d.date) || {date:d.date, count:0, earn:0, grow:0, plant:0, lastCum:0, lastPlant:0};
+      t.count += d.count; t.earn += d.earn; t.grow += d.grow || 0; t.plant += d.plant; t.lastCum += d.lastCum; t.lastPlant += d.lastPlant;
+      map.set(d.date, t);
+    }));
+    return [...map.values()].sort((x,y) => x.date < y.date ? -1 : (x.date > y.date ? 1 : 0));
+  }
+
+  /* ---------- 接口 ---------- */
+  async function postJSON(url, body, headers){
+    const res = await netFetch(url, {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, headers || {}),
+      body: JSON.stringify(body)
+    });
+    const ct = res.headers.get('content-type') || '';
+    return ct.includes('json') ? await res.json() : {code:res.status, msg:await res.text()};
+  }
+  function hintOf(code){
+    if(code===403) return '403：开放接口未开启，或当前公网 IP 不在安全 IP 列表内。';
+    if(code===302) return '302：未登录 / accessKey 无效，请检查 token 与 secretKey。';
+    if(code===429) return '429：请求过于频繁，稍后再试。';
+    if(code===401) return '401：鉴权失败，请重新获取 accessKey。';
+    return '';
+  }
+  async function ensureKey(force){
+    if(!state.token || !state.secret) throw new Error('请先在「设置」中填写 token 与 secretKey');
+    if(!force && state.accessKey && Date.now() < state.keyExp - 5*60*1000) return state.accessKey;
+    const d = await postJSON(API_KEY, {token:state.token, secretKey:state.secret});
+    if(d.code !== 200) throw new Error('获取 accessKey 失败：' + (d.msg || d.code) + ' ' + hintOf(d.code));
+    state.accessKey = d.data.accessKey;
+    state.keyExp = Date.now() + (d.data.expiresIn || 7200)*1000;
+    $('who').textContent = d.data.nickName ? ('已连接：' + d.data.nickName) : '已连接';
+    return state.accessKey;
+  }
+
+  /* ---------- 消息列表 ---------- */
+  async function loadList(page, silent, detect, retried){
+    if(!silent) setStatus($('listStatus'), '加载中…');
+    try{
+      const key = await ensureKey(!!retried);   // 失败重试时强制换新 accessKey
+      const d = await postJSON(API_LIST, {current:page, pageSize:state.size}, {'access-key':key});
+      if(d.code !== 200) throw new Error('获取列表失败：' + (d.msg || d.code) + ' ' + hintOf(d.code));
+      state.page  = d.data.pageNum;
+      state.total = d.data.total;
+      state.pages = d.data.pages;
+      state.list  = d.data.list || [];
+      // 识别本次新增的消息（仅自动读取时判断，首次加载/翻页/改每页条数不算）
+      const fresh = (state.listReady && (detect || silent)) ? state.list.filter(m => m.shortCode && !state.seenCodes.has(m.shortCode)) : [];
+      state.freshCodes = new Set(fresh.map(m => m.shortCode));
+      state.list.forEach(m => { if(m.shortCode) state.seenCodes.add(m.shortCode); });
+      // 记录每个账号的最新推送时间（用于分账号超时提醒）
+      state.list.forEach(noteAcct);
+      saveAcctLast();
+      renderList();
+      $('btnDaily').disabled = false;
+      const latest = state.list.length ? (state.list[0].updateTime || '') : '';
+      setStatus($('listStatus'), `共 ${state.total} 条消息` + (latest ? ` · 最新 ${latest}` : ''), 'ok');
+      state.listReady = true;
+      enrichList();                       // 补全左侧列表的种植/累计/摇晃概要（缓存优先）
+      if(fresh.length) autoReadNew(fresh);
+      if(fresh.length) checkShakes(fresh);
+      checkStale();
+    }catch(err){
+      // 网络抖动/accessKey 失效时自动重试一次（800ms 后强制刷新 key）
+      if(!retried){
+        setStatus($('listStatus'), '拉取失败，正在重试：' + err.message, 'warn');
+        setTimeout(() => loadList(page, silent, detect, true), 800);
+        return;
+      }
+      setStatus($('listStatus'), '拉取失败：' + err.message, 'err');
+    }
+  }
+
+  // 有新推送时自动读取：直接打开最新一条（异常/宝箱不读）；统计面板打开时自动重算
+  function autoReadNew(fresh){
+    const useful = fresh.filter(m => !isFilteredMsg(m));
+    if(!useful.length) return;
+    setStatus($('listStatus'), `自动读取到 ${useful.length} 条新消息`, 'warn');
+    if(state.view === 'daily'){   // 正在看统计时不跳走，只自动重算
+      if(state.daily && !$('dRun').disabled) runDaily();
+      return;
+    }
+    loadDetail(useful[0].shortCode, useful[0]);
+  }
+
+  /* ---------- 自动刷新 / 超时提醒 ---------- */
+  function parseTs(s){
+    const m = String(s || '').match(/(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    return m ? new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +(m[6]||0)).getTime() : NaN;
+  }
+  function alertThreshold(){
+    const c = Number($('alertCustom').value || 0);   // 手动输入优先
+    return c > 0 ? c : Number($('alertMin').value || 0);
+  }
+  function fmtTs(ts){
+    const d = new Date(ts);
+    const p = n => String(n).padStart(2, '0');
+    return `${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  const fmtGap = n => n >= 1440
+    ? `${Math.floor(n/1440)} 天 ${Math.floor((n%1440)/60)} 小时`
+    : (n >= 60 ? `${Math.floor(n/60)} 小时 ${n%60} 分钟` : `${n} 分钟`);
+  // 记录账号最新推送时间（只统计「种树完成」类推送；异常/宝箱不计入）
+  const ACCT_KEY = 'pp_acct_last';
+  const treeMsg = m => !!m && isKeptMsg(m, '') && !isFilteredMsg(m);
+  function noteAcct(m){
+    if(!treeMsg(m)) return;
+    const name = detectAccount(m, '');
+    const ts = parseTs(m.updateTime);
+    if(!name || name === '未识别' || isNaN(ts)) return;
+    if(!state.acctLast.has(name) || ts > state.acctLast.get(name)) state.acctLast.set(name, ts);
+  }
+  function saveAcctLast(){
+    try{ localStorage.setItem(ACCT_KEY, JSON.stringify([...state.acctLast])); }catch(e){}
+  }
+  function loadAcctLast(){
+    try{
+      // 旧版本把所有类型推送都记入基线，升级后清一次，避免拿异常/宝箱时间误判
+      if(localStorage.getItem('pp_acct_v') !== '2'){
+        localStorage.removeItem(ACCT_KEY);
+        localStorage.setItem('pp_acct_v', '2');
+      }
+      const raw = localStorage.getItem(ACCT_KEY);
+      if(raw) JSON.parse(raw).forEach(r => { if(r && r[0] && r[1]) state.acctLast.set(r[0], r[1]); });
+    }catch(e){}
+  }
+  // 用已读列表缓存重建各账号最新「种树完成」时间（启动时即可判断，无需等第 1 页）
+  function seedAcctFromFull(){
+    if(!state.full) return;
+    const latest = new Map();
+    state.full.forEach(m => {
+      if(!treeMsg(m)) return;
+      const name = detectAccount(m, '');
+      const ts = parseTs(m.updateTime);
+      if(!name || name === '未识别' || isNaN(ts)) return;
+      if(!latest.has(name) || ts > latest.get(name)) latest.set(name, ts);
+    });
+    latest.forEach((ts, name) => state.acctLast.set(name, ts));
+    saveAcctLast();
+  }
+  // 定时检查专用：只读最新一页判断各账号推送时间，不改动列表/不触发自动读取
+  async function refreshLatest(){
+    try{
+      const key = await ensureKey();
+      const d = await postJSON(API_LIST, {current:1, pageSize:100}, {'access-key':key});
+      if(d.code !== 200) return;
+      (d.data.list || []).forEach(noteAcct);
+      saveAcctLast();
+      checkStale();
+    }catch(e){}
+  }
+  // 分账号计算「距该账号最新一条推送」的时长；同一条推送只提醒一次，全部恢复后自动关闭弹窗
+  function checkStale(){
+    const min = alertThreshold();
+    if(!min || !state.acctLast.size) return;
+    const now = Date.now();
+    const stale = [];
+    state.acctLast.forEach((ts, name) => {
+      if(name === '未识别') return;
+      const gap = Math.floor((now - ts) / 60000);
+      if(gap >= min) stale.push({name, ts, gap});
+    });
+    if(!stale.length){ $('warnMask').classList.add('hide'); return; }   // 都有新推送了，解除提醒
+    const unseen = stale.filter(s => state.alerted.get(s.name) !== s.ts);
+    if(!unseen.length) return;   // 当前超时名单已提醒过，不重复弹窗
+    stale.forEach(s => state.alerted.set(s.name, s.ts));
+    stale.sort((a,b) => b.gap - a.gap);
+    $('warnTitle').textContent = `推送超时提醒 · ${stale.length} 个账号`;
+    const names = stale.map(s => esc(s.name)).join('、');
+    const rows = stale.map(s => `<tr><td>${esc(s.name)}</td><td>${fmtTs(s.ts)}</td><td class="num">${fmtGap(s.gap)}</td></tr>`).join('');
+    $('warnMsg').innerHTML = `以下账号超过 <b>${min} 分钟</b>没有「种树完成」推送：` +
+      `<span class="names">${names}</span>` +
+      `<table class="tbl" style="margin-top:10px"><tr><th>账号</th><th>最新推送</th><th class="num">已超时</th></tr>${rows}</table>`;
+    $('warnMask').classList.remove('hide');
+  }
+  /* ---------- 摇晃次数提醒（<6 普通提醒；>=11 重点提醒，带特赦令牌图标） ---------- */
+  const SHAKE_LOW = 6, SHAKE_HIGH = 11;
+  const TOKEN_SVG = '<svg viewBox="0 0 120 170" width="86" height="122" aria-hidden="true">' +
+    '<path d="M44 8h32l-7 15H51z" fill="#b3352a"/>' +
+    '<path d="M60 23c-9 0-13 8-13 13h26c0-5-4-13-13-13z" fill="#d94b3c"/>' +
+    '<path d="M60 36v10" stroke="#d94b3c" stroke-width="7"/>' +
+    '<rect x="18" y="45" width="84" height="112" rx="14" fill="#f0c04e" stroke="#7a4d0c" stroke-width="3"/>' +
+    '<rect x="26" y="53" width="68" height="96" rx="10" fill="none" stroke="#fff6d5" stroke-width="2" opacity=".75"/>' +
+    '<text x="60" y="120" text-anchor="middle" font-family="KaiTi,STKaiti,serif" font-size="58" font-weight="700" fill="#9e1f16">赦</text>' +
+    '<circle cx="60" cy="146" r="4" fill="#b3352a" opacity=".85"/>' +
+    '</svg>';
+  // 取新消息的摇晃次数：内存缓存 → 本地存档 → 请求详情（并发 3），结果同时写入缓存/存档
+  async function checkShakes(fresh){
+    const items = (fresh || []).filter(m => treeMsg(m) && m.shortCode && !state.shakeAlerted.has(m.shortCode));
+    if(!items.length) return;
+    const low = [], high = [];
+    let idx = 0;
+    const worker = async () => {
+      while(idx < items.length){
+        const m = items[idx++];
+        let shake = null;
+        const hit = state.detailCache.get(m.shortCode);
+        if(hit && hit.shake != null) shake = hit.shake;
+        if(shake == null) shake = store.getShake(m.shortCode);
+        if(shake == null){
+          try{
+            const res = await netFetch(API_SHORT + encodeURIComponent(m.shortCode));
+            const text = htmlToText(await res.text());
+            shake = parseShake(text);
+            const plant = parsePlant(text), cum = parseCum(text), acct = detectAccount(m, text), perK = parsePerK(text);
+            state.detailCache.set(m.shortCode, {m, cash:0, items:0, earn:parseEarn(text), plant, cum, perK, acct, keep:true, shake});
+            if(shake != null) store.put({c:m.shortCode, t:m.updateTime || '', a:acct, p:plant, u:cum, s:shake, k:perK});
+          }catch(e){}
+        }
+        if(shake == null) continue;
+        state.shakeAlerted.add(m.shortCode);
+        const rec = {name: detectAccount(m, ''), shake};
+        if(shake >= SHAKE_HIGH) high.push(rec);
+        else if(shake < SHAKE_LOW) low.push(rec);
+      }
+    };
+    await Promise.all(Array.from({length: Math.min(3, items.length)}, worker));
+    store.save();
+    if(high.length || low.length) showShakeAlert(low, high);
+  }
+  function showShakeAlert(low, high){
+    const hasHigh = high.length > 0;
+    $('shakeTitle').textContent = hasHigh ? `重点提醒 · 摇晃 ${SHAKE_HIGH} 次及以上` : `摇晃次数提醒 · 少于 ${SHAKE_LOW} 次`;
+    let html = '';
+    if(hasHigh){
+      html += `<div class="tk">${TOKEN_SVG}</div>` +
+        `<div class="tk-tip">令牌机会！以下账号摇晃 <b>${SHAKE_HIGH} 次及以上</b>，请重点关注：</div>` +
+        '<table class="tbl"><tr><th>账号</th><th class="num">摇晃次数</th></tr>' +
+        high.sort((a,b) => b.shake - a.shake).map(r => `<tr class="hl"><td>${esc(r.name)}</td><td class="num">${r.shake} 次</td></tr>`).join('') + '</table>';
+    }
+    if(low.length){
+      html += (hasHigh ? '<div style="height:14px"></div>' : '') +
+        `<div class="tk-tip">以下账号摇晃次数不足 <b>${SHAKE_LOW} 次</b>：</div>` +
+        '<table class="tbl"><tr><th>账号</th><th class="num">摇晃次数</th></tr>' +
+        low.sort((a,b) => a.shake - b.shake).map(r => `<tr><td>${esc(r.name)}</td><td class="num">${r.shake} 次</td></tr>`).join('') + '</table>';
+    }
+    $('shakeMsg').innerHTML = html;
+    $('shakeDlg').classList.toggle('token', hasHigh);
+    $('shakeMask').classList.remove('hide');
+  }
+  /* ---------- 本地消息存档（旧推送自动保存，过期自动清理） ---------- */
+  const STORE_KEY = 'pp_msg_store';
+  const store = {
+    data: new Map(), dirty: false,
+    load(){
+      try{
+        const raw = localStorage.getItem(STORE_KEY);
+        if(raw) JSON.parse(raw).forEach(r => { if(r && r.c) this.data.set(r.c, r); });
+      }catch(e){}
+      this.prune();
+    },
+    keepDays(){
+      const d = Number(localStorage.getItem('pp_keepDays') || 7);
+      return d > 0 ? d : 7;
+    },
+    prune(){
+      const cutoff = Date.now() - this.keepDays() * 86400000;
+      let removed = 0;
+      this.data.forEach((r, c) => {
+        const ts = parseTs(r.t);
+        if(isNaN(ts) || ts < cutoff){ this.data.delete(c); removed++; }
+      });
+      if(removed){ this.dirty = true; this.save(); }
+      return removed;
+    },
+    put(rec){ this.data.set(rec.c, rec); this.dirty = true; },
+    get(code){
+      const r = this.data.get(code);
+      return (r && r.u != null) ? r : null;   // 仅返回已成功解析累计收益的存档
+    },
+    getShake(code){
+      const r = this.data.get(code);
+      return (r && r.s != null) ? r.s : null;
+    },
+    save(){
+      if(!this.dirty) return;
+      this.dirty = false;
+      try{ localStorage.setItem(STORE_KEY, JSON.stringify([...this.data.values()])); }catch(e){}
+    }
+  };
+
+  /* ---------- 完整列表缓存（持久化，统计时只补拉新推送） ---------- */
+  const LIST_KEY = 'pp_msg_list';
+  function saveFull(){
+    if(!state.full) return;
+    try{
+      localStorage.setItem(LIST_KEY, JSON.stringify({
+        s: state.fullScope,
+        msgs: state.full.map(m => ({c: m.shortCode, t: m.title || '', u: m.updateTime || ''}))
+      }));
+    }catch(e){}
+  }
+  function loadFull(){
+    try{
+      const raw = localStorage.getItem(LIST_KEY);
+      if(!raw) return;
+      const j = JSON.parse(raw);
+      if(!j || !Array.isArray(j.msgs) || !j.msgs.length) return;
+      state.full = j.msgs.filter(x => x && x.c).map(x => ({shortCode: x.c, title: x.t || '', updateTime: x.u || ''}));
+      state.fullScope = j.s || '';
+    }catch(e){}
+  }
+  function pruneFull(){
+    if(!state.full || !state.full.length) return 0;
+    const cutoff = Date.now() - store.keepDays() * 86400000;
+    const before = state.full.length;
+    state.full = state.full.filter(m => {
+      const ts = parseTs(m.updateTime);
+      return isNaN(ts) || ts >= cutoff;
+    });
+    const removed = before - state.full.length;
+    if(removed) saveFull();
+    return removed;
+  }
+
+  let autoTimer = null;
+  function setupAuto(){
+    if(autoTimer){ clearInterval(autoTimer); autoTimer = null; }
+    const sec = Number($('autoSec').value || 0);
+    if(sec > 0){
+      autoTimer = setInterval(() => { if(!$('btnRefresh').disabled) loadList(1, true); }, sec * 1000);
+    }
+    $('autoHint').textContent = sec > 0 ? `自动读取：每 ${sec >= 60 ? (sec/60) + ' 分钟' : sec + ' 秒'}` : '';
+  }
+  let statsTimer = null;
+  function setupStatsAuto(){
+    if(statsTimer){ clearInterval(statsTimer); statsTimer = null; }
+    const min = Number(state.dAuto || 0);
+    const hint = $('dAutoHint');
+    if(hint) hint.textContent = min > 0 ? `每 ${min} 分钟自动统计` : '';
+    if(min > 0){
+      statsTimer = setInterval(() => {
+        if(state.view !== 'daily') return;          // 只在统计面板打开时重算
+        const b = $('dRun');
+        if(b && !b.disabled) runDaily();
+      }, min * 60000);
+    }
+  }
+  function loadAutoCfg(){
+    try{
+      const a = localStorage.getItem('pp_autoSec');   if(a != null) $('autoSec').value = a;
+      const b = localStorage.getItem('pp_alertMin');  if(b != null) $('alertMin').value = b;
+      const c = localStorage.getItem('pp_dAuto');     if(c != null) state.dAuto = Number(c) || 0;
+      const e = localStorage.getItem('pp_alertCustom'); if(e != null) $('alertCustom').value = e;
+      const k = localStorage.getItem('pp_keepDays');    if(k != null) $('keepDays').value = k;
+    }catch(e){}
+    setupAuto();
+  }
+  function renderList(){
+    const kw = state.kw.trim().toLowerCase();
+    const arr = state.list.filter(m => !kw || (m.title||'').toLowerCase().includes(kw));
+    const box = $('list');
+    if(!arr.length){
+      box.innerHTML = '<div class="empty">没有符合条件的消息</div>';
+    }else{
+      box.innerHTML = arr.map(m => {
+        const code = m.shortCode || '';
+        const active = state.sel && state.sel.shortCode === code ? ' active' : '';
+        const isNew = state.freshCodes.has(code);
+        return `<div class="msg${active}" data-code="${esc(code)}">
+          <div class="t">${isNew ? '<span class="dot"></span>' : ''}${esc(m.title || '(无标题)')}</div>
+          <div class="m"><span>${esc(m.updateTime||'')}</span><span>${esc(m.channel||'')}</span></div>
+          ${metaLine(metaOf(code))}
+        </div>`;
+      }).join('');
+      box.querySelectorAll('.msg').forEach(el => el.onclick = () => loadDetail(el.dataset.code));
+    }
+    $('pageInfo').textContent = `第 ${state.page || 1} / ${state.pages || 1} 页`;
+    $('prev').disabled = (state.page <= 1);
+    $('next').disabled = (state.pages ? state.page >= state.pages : true);
+  }
+  // 保持左侧滚动位置的局部刷新（补全数据时用）
+  function renderListKeepScroll(){
+    const box = $('list');
+    const top = box.scrollTop;
+    renderList();
+    box.scrollTop = top;
+  }
+  // 某条消息的已知概要：内存缓存优先，其次本地存档（没解析过则返回 null，不瞎猜）
+  function metaOf(code){
+    const hit = state.detailCache.get(code);
+    if(hit && (hit.plant != null || hit.perK != null || hit.shake != null))
+      return {plant: hit.plant, perK: hit.perK, shake: hit.shake, parsed: Object.prototype.hasOwnProperty.call(hit, 'perK')};
+    const r = store.data.get(code);
+    if(r && (r.p != null || r.k != null || r.s != null))
+      return {plant: r.p, perK: r.k, shake: r.s, parsed: Object.prototype.hasOwnProperty.call(r, 'k')};
+    return null;
+  }
+  function metaLine(meta){
+    if(!meta) return '';
+    const parts = [];
+    if(meta.plant != null) parts.push(`<span class="chip">种植 <b>${meta.plant}</b> 棵</span>`);
+    // 单棵收益按「万」存储，fmtC 接受的是「元」，故乘回 10000 再格式化
+    if(meta.perK != null) parts.push(`<span class="chip">单棵收益 ${fmtC(meta.perK * 10000)}</span>`);
+    if(meta.shake != null){
+      const cls = meta.shake < SHAKE_LOW ? 'neg' : (meta.shake >= SHAKE_HIGH ? 'key' : '');
+      parts.push(`<span class="chip">摇晃 <b class="${cls}">${meta.shake} 次</b></span>`);
+    }
+    return parts.length ? `<div class="metaline">${parts.join('')}</div>` : '';
+  }
+  // 补全当前页种树消息的概要（缓存/存档命中不请求；缺单棵收益的旧存档补拉一次，并发 4）
+  let enrichSeq = 0;
+  async function enrichList(){
+    const seq = ++enrichSeq;
+    const items = state.list.filter(m => {
+      if(!m.shortCode || !treeMsg(m) || state.freshCodes.has(m.shortCode)) return false;
+      const meta = metaOf(m.shortCode);
+      return !meta || !meta.parsed;      // 存档里没有单棵收益（旧数据）→ 补拉一次并写回
+    });
+    if(!items.length) return;
+    let idx = 0, lastPaint = 0;
+    const worker = async () => {
+      while(idx < items.length && seq === enrichSeq){
+        const m = items[idx++];
+        try{
+          const res = await netFetch(API_SHORT + encodeURIComponent(m.shortCode));
+          if(seq !== enrichSeq) return;
+          const txt = htmlToText(await res.text());
+          const plant = parsePlant(txt), cum = parseCum(txt), acct = detectAccount(m, txt), shake = parseShake(txt), perK = parsePerK(txt);
+          state.detailCache.set(m.shortCode, {m, cash:0, items:0, earn:parseEarn(txt), plant, cum, perK, acct, keep:isKeptMsg(m, txt), shake});
+          if(cum != null) store.put({c:m.shortCode, t:m.updateTime || '', a:acct, p:plant, u:cum, s:shake, k:perK});
+        }catch(e){}
+        if(Date.now() - lastPaint > 300 && seq === enrichSeq){ lastPaint = Date.now(); renderListKeepScroll(); }
+      }
+    };
+    await Promise.all(Array.from({length: Math.min(4, items.length)}, worker));
+    if(seq === enrichSeq){ store.save(); renderListKeepScroll(); }
+  }
+
+  /* ---------- 单条收益 ---------- */
+  async function loadDetail(shortCode){
+    const m = state.list.find(x => x.shortCode === shortCode);
+    if(m) state.sel = m;
+    state.view = 'detail';
+    state.showRaw = false;
+    renderList();
+    setStatus($('detailStatus'), '加载中…');
+    try{
+      const res = await netFetch(API_SHORT + encodeURIComponent(shortCode));
+      state.rawHtml = await res.text();
+      state.plainText = htmlToText(state.rawHtml);
+      state.view = 'detail';
+      state.showRaw = false;
+      renderPane();
+      $('detailTitle').textContent = (m ? m.title + ' · ' + (m.updateTime||'') : shortCode);
+      $('btnRaw').disabled = false;
+      $('btnRaw').textContent = '查看原文';
+      $('btnCopySum').disabled = false;
+      setStatus($('detailStatus'), '');
+    }catch(err){
+      setStatus($('detailStatus'), '加载失败：' + err.message, 'err');
+    }
+  }
+
+  function renderPane(){
+    const pane = $('pane');
+    if(state.view === 'daily'){ renderDaily(pane); return; }
+    if(!state.rawHtml){
+      pane.innerHTML = '<div class="empty">左侧选择一条推送消息</div>';
+      return;
+    }
+    if(state.showRaw){
+      pane.innerHTML = '<pre>' + esc(state.plainText || '（未提取到文本）') + '</pre>';
+      return;
+    }
+    const m = state.sel || {};
+    const filtered = isFilteredMsg(m);
+    const earn = filtered ? null : parseEarn(state.plainText);
+    const plant = filtered ? null : parsePlant(state.plainText);
+    const cum = filtered ? null : parseCum(state.plainText);
+    const shake = filtered ? null : parseShake(state.plainText);
+    pane.innerHTML =
+      '<div class="bigcard"><div class="cap">' + (filtered ? '本条收益（已过滤：异常/宝箱）' : '本条收益') + '</div><b>' +
+      (filtered ? '—' : fmtC(earn)) + '</b>' +
+      (plant != null ? '<div class="meta">种植数量：' + plant + ' 棵</div>' : '') +
+      (shake != null ? '<div class="meta">摇晃次数：<b class="' + (shake < SHAKE_LOW ? 'neg' : (shake >= SHAKE_HIGH ? 'pos' : '')) + '">' + shake + ' 次</b>' +
+        (shake < SHAKE_LOW ? '（偏少）' : (shake >= SHAKE_HIGH ? '（重点）' : '')) + '</div>' : '') +
+      (plant != null ? '<div class="meta">平均收益：' + fmtC(avgPush({lastPlant:plant, lastCum:cum})) + '</div>' : '') +
+      '<div class="meta">账号：' + esc(detectAccount(m, state.plainText)) + ' · ' +
+      esc(m.title || '') + (m.updateTime ? ' · ' + esc(m.updateTime) : '') + '</div></div>';
+  }
+
+  /* ---------- 过滤 & 金额识别 ---------- */
+  const FILTER_WORDS = /(异常|宝箱)/;                 // 标题含这些词 → 整条不计入统计
+  const KEEP_WORDS   = /(种树|种植)/;                 // 只统计「种树完成」类消息
+  const TIME_LINE    = /^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}([ T]+\d{1,2}:\d{2}(:\d{2})?)?$|^\d{1,2}:\d{2}(:\d{2})?$/;  // 时间行不算金额
+  const isFilteredMsg = m => FILTER_WORDS.test((m && m.title) || '');
+  const isKeptMsg = (m, text) => KEEP_WORDS.test((m && m.title) || '') || KEEP_WORDS.test(text || '');
+  // 拆解「当前具体收益」区块：现金增量（含 = 的行）与物品金额（含 -- 的行）分别累计
+  function parseMoney(text){
+    const lines = (text || '').split('\n').map(s => s.trim()).filter(Boolean);
+    let cash = 0, items = 0;
+    for (const ln of lines){
+      const l = ln.replace(/\u00a0/g, ' ').trim();
+      if(!l || FILTER_WORDS.test(l) || TIME_LINE.test(l)) continue;   // 含过滤词 / 时间行 → 不计入
+      if(l.includes('=')){
+        const m = l.split('=').pop().match(/[-−]?\d[\d,，]*/g);
+        if(m){ cash += toNum(m[m.length-1]); continue; }
+      }
+      let mi = l.match(/^(.*?)\s*[－—–─\-]{2,}\s*([-−]?\d[\d,，]*)\s*$/);
+      if(mi && mi[1].trim()){ items += toNum(mi[2]); continue; }
+      mi = l.match(/^(.*?)\s*[:：]\s*([-−]?\d[\d,，]*)\s*$/);
+      if(mi && mi[1].trim()){ items += toNum(mi[2]); continue; }
+    }
+    return {cash, items, total: cash + items};
+  }
+  function parseEarn(text){ const m = parseMoney(text); return m.total; }
+
+  /* ---------- 种植数量 / 累计收益 ---------- */
+  function parsePlant(text){
+    const m = String(text || '').match(/(?:已种植|种植数量|种植)\s*[:：]?\s*(\d[\d,，]*)\s*棵/);
+    return m ? toNum(m[1]) : null;
+  }
+  function parseCum(text){        // 推送里的「累计收益:N万」→ 元（支持负数）
+    const m = String(text || '').match(/累计收益\s*[:：]\s*([-−]?\d[\d,，]*)\s*万/);
+    return m ? toNum(m[1]) * 10000 : null;
+  }
+  function parsePerK(text){       // 推送里的「单棵收益:N万」→ N（单位：万）；无「万」按元换算
+    const m = String(text || '').match(/单[棵颗]收益\s*[:：]?\s*([-−]?\d[\d,，]*(?:\.\d+)?)\s*(万)?/);
+    if(!m) return null;
+    const v = toNum(m[1]);
+    return m[2] ? v : v / 10000;
+  }
+  function parseShake(text){      // 推送里的「一共摇晃N次」→ N
+    const m = String(text || '').match(/摇晃\D{0,4}(\d+)\s*次/);
+    return m ? Number(m[1]) : null;
+  }
+
+  /* ---------- 账号识别 ---------- */
+  const ACCT_LABEL = /(?:账号|帐号|角色|昵称|用户名|玩家|游戏名|UID|ID)\s*[:：]\s*([^\s,，、|｜;；/\\]{1,24})/;
+  const ACCT_NOISE = /(收益|结算|日报|汇总|统计|推送|提醒|通知|每日|今天|昨日|记录|报表|详情|种树|种植|完成|设备|异常|宝箱|发现)/g;
+  function cleanAcct(s){
+    const t = String(s || '').replace(ACCT_NOISE, '').replace(/[\s\-|｜_·:：/\\]+/g, '').trim();
+    return (t.length > 0 && t.length <= 12) ? t : '';
+  }
+  function detectAccount(msg, text){
+    const title = (msg && msg.title) || '';
+    const body  = text || '';
+    let m;
+    // 1) 正文里的显式标签：账号/角色/昵称…
+    if((m = body.match(ACCT_LABEL))  && m[1].trim()) return m[1].trim();
+    // 2) 标题里的显式标签
+    if((m = title.match(ACCT_LABEL)) && m[1].trim()) return m[1].trim();
+    // 3) 标题形如「张三 - 收益」/「张三：收益」/「张三|收益」
+    if((m = title.match(/^\s*([^\-\|｜_·:：/\\]{1,24}?)\s*[\-\|｜_·:：/\\]/)) && cleanAcct(m[1])) return cleanAcct(m[1]);
+    // 4) 标题形如「张三&收益」
+    if((m = title.match(/^\s*([^\s&＆]{1,24}?)\s*[&＆]/)) && cleanAcct(m[1])) return cleanAcct(m[1]);
+    // 5) 整条标题去掉通用词后剩下的（如「张三收益」→「张三」）
+    const c = cleanAcct(title);
+    if(c) return c;
+    return '未识别';
+  }
+
+  function htmlToText(html){
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script,style,noscript,head').forEach(e => e.remove());
+    doc.querySelectorAll('br').forEach(e => e.replaceWith('\n'));
+    doc.querySelectorAll('p,div,li,tr,h1,h2,h3,h4,h5,h6,section,article,header,footer').forEach(e => e.append('\n'));
+    let t = (doc.body ? doc.body.textContent : '') || '';
+    t = t.replace(/\u00a0/g,' ').replace(/\n{3,}/g,'\n\n');
+    return t.split('\n').map(s => s.trim()).filter((s,i,a) => s !== '' || (a[i-1]||'') !== '').join('\n').trim();
+  }
+
+  /* ---------- 按日期累计 ---------- */
+  function renderDaily(pane){
+    pane.innerHTML = `
+      <div class="daily">
+        <div class="opts">
+          <span style="color:var(--sub);font-size:12px">统计范围</span>
+          <select id="dScope">
+            <option value="page">当前页（${state.list.length} 条）</option>
+            <option value="1000">1000 条</option>
+            <option value="all">全部（${state.total} 条）</option>
+          </select>
+          <span style="color:var(--sub);font-size:12px">自动统计</span>
+          <select id="dAuto">
+            <option value="0">关闭</option>
+            <option value="5">5 分钟</option>
+            <option value="10">10 分钟</option>
+            <option value="30">30 分钟</option>
+            <option value="60">1 小时</option>
+          </select>
+          <span id="dAutoHint" style="color:var(--warn);font-size:12px"></span>
+          <button id="dRun" class="primary">开始统计</button>
+          <button id="dCsv" disabled>导出 CSV</button>
+          <button id="dMd" disabled>复制汇总</button>
+        </div>
+        <div class="prog"><i id="dProg"></i></div>
+        <div id="dInfo" class="status"></div>
+        <div id="dResult"></div>
+      </div>`;
+    $('dRun').onclick = () => runDaily();
+    $('dCsv').onclick = () => exportDailyCsv();
+    $('dMd').onclick = () => copyDailyMarkdown();
+    $('dAuto').value = String(state.dAuto || 0);
+    $('dAuto').onchange = () => {
+      state.dAuto = Number($('dAuto').value) || 0;
+      try{ localStorage.setItem('pp_dAuto', state.dAuto); }catch(e){}
+      setupStatsAuto();
+    };
+    setupStatsAuto();
+    if(state.daily) renderDailyResult();
+    else setStatus($('dInfo'), '旧推送使用本地存档、列表也复用已读缓存，只有新推送会请求接口。');
+  }
+
+  async function fetchAllMessages(infoEl, scope, limit){
+    const key = await ensureKey();
+    const ps = 50;
+    const cap = Math.min(limit || state.total, state.total);
+    const pages = Math.max(1, Math.ceil(cap / ps));
+    const fetchPage = async p => {
+      const d = await postJSON(API_LIST, {current:p, pageSize:ps}, {'access-key':key});
+      if(d.code !== 200) throw new Error('拉取列表失败：' + (d.msg||d.code) + ' ' + hintOf(d.code));
+      return d.data.list || [];
+    };
+    const cached = (state.full && state.fullScope === scope) ? state.full : null;
+
+    // 已有列表缓存：只向前探新推送，遇到已读消息即停止（通常只需 1 个请求）
+    if(cached && cached.length){
+      const seen = new Set(cached.map(m => m.shortCode));
+      const fresh = [];
+      let p = 1, stop = false;
+      while(!stop && p <= pages){
+        const list = await fetchPage(p);
+        if(!list.length) break;
+        for(const m of list){
+          if(m.shortCode && seen.has(m.shortCode)){ stop = true; break; }
+          fresh.push(m);
+        }
+        if(list.length < ps) break;
+        p++;
+      }
+      if(!fresh.length){
+        setStatus(infoEl, `复用已读列表 ${cached.length} 条，无新推送`, 'ok');
+        return cached.slice(0, cap);
+      }
+
+      const merged = [], used = new Set();
+      fresh.concat(cached).forEach(m => {
+        if(m.shortCode && !used.has(m.shortCode)){ used.add(m.shortCode); merged.push(m); }
+      });
+      // 范围比已读条数更大时，顺延补拉更旧的页
+      while(merged.length < cap){
+        const list = await fetchPage(Math.floor(merged.length / ps) + 1);
+        if(!list.length) break;
+        list.forEach(m => {
+          if(m.shortCode && !used.has(m.shortCode)){ used.add(m.shortCode); merged.push(m); }
+        });
+        if(list.length < ps) break;
+      }
+      state.full = merged.slice(0, cap);
+      state.fullScope = scope;
+      saveFull();
+      seedAcctFromFull();
+      setStatus(infoEl, `新推送 ${fresh.length} 条，其余复用已读列表`, 'ok');
+      return state.full;
+    }
+
+    // 首次读取（或切换范围）：全量并发拉取列表
+    const out = new Array(pages);
+    let cur = 0, got = 0, lastPaint = 0;
+    const paint = () => {
+      const now = Date.now();
+      if(now - lastPaint < 150 && got < cap) return;
+      lastPaint = now;
+      setStatus(infoEl, `拉取列表 ${got}/${cap}`);
+    };
+    const worker = async () => {
+      while(cur < pages){
+        const p = cur++;
+        const d = await postJSON(API_LIST, {current:p, pageSize:ps}, {'access-key':key});
+        if(d.code !== 200) throw new Error('拉取列表失败：' + (d.msg||d.code) + ' ' + hintOf(d.code));
+        out[p-1] = d.data.list || [];
+        got += out[p-1].length;
+        paint();
+      }
+    };
+    await Promise.all(Array.from({length: Math.min(6, pages)}, worker));
+    // 并发拉取可能因限流返回空页，逐页补齐，避免漏消息
+    for(let p = 1; p <= pages; p++){
+      if(out[p-1] && out[p-1].length) continue;
+      const d = await postJSON(API_LIST, {current:p, pageSize:ps}, {'access-key':key});
+      if(d.code !== 200) throw new Error('拉取列表失败：' + (d.msg||d.code) + ' ' + hintOf(d.code));
+      out[p-1] = d.data.list || [];
+      setStatus(infoEl, `补拉第 ${p} 页…`);
+    }
+    state.full = out.reduce((a,x) => a.concat(x), []).slice(0, cap);
+    state.fullScope = scope;
+    saveFull();
+    seedAcctFromFull();
+    return state.full;
+  }
+
+  async function runDaily(){
+    const infoEl = $('dInfo');
+    const scope = $('dScope').value;
+    $('dRun').disabled = true; $('dCsv').disabled = true; $('dMd').disabled = true;
+    $('dProg').style.width = '0';
+    try{
+      const all = scope === 'page' ? state.list.slice() : await fetchAllMessages(infoEl, scope, scope === 'all' ? state.total : Number(scope));
+      // 超过保留天数的旧推送已在清理时移除，不再重复读取
+      const cutoff = Date.now() - store.keepDays() * 86400000;
+      const msgs = all.filter(m => !isFilteredMsg(m)).filter(m => {
+        const ts = parseTs(m.updateTime);
+        return isNaN(ts) || ts >= cutoff;
+      });
+      const skippedHead = all.length - msgs.length;
+      if(!all.length) throw new Error('没有可统计的消息');
+      if(!msgs.length) throw new Error('没有可统计的消息（异常/宝箱或超出保留天数已排除）');
+      const n = msgs.length;
+      const results = new Array(n);
+      let done = 0, idx = 0, lastPaint = 0;
+      const paint = force => {
+        const now = Date.now();
+        if(!force && now - lastPaint < 150 && done < n) return;
+        lastPaint = now;
+        $('dProg').style.width = (done/n*100).toFixed(1) + '%';
+        setStatus(infoEl, `解析中 ${done}/${n}`);
+      };
+      const worker = async () => {
+        while(idx < n){
+          const i = idx++;
+          const m = msgs[i];
+          const hit = state.detailCache.get(m.shortCode);   // 命中缓存则跳过网络请求
+          if(hit){ results[i] = Object.assign({}, hit, {m}); done++; paint(); continue; }
+          const saved = store.get(m.shortCode);             // 命中本地存档（旧推送）→ 不再请求
+          if(saved){ results[i] = {m, cash: 0, items: 0, earn: null, plant: saved.p, cum: saved.u, acct: saved.a, keep: true}; done++; paint(); continue; }
+          try{
+            const r = await netFetch(API_SHORT + encodeURIComponent(m.shortCode));
+            const txt = htmlToText(await r.text());
+            const money = parseMoney(txt);
+            const row = {cash: money.cash, items: money.items, earn: money.total, plant: parsePlant(txt), cum: parseCum(txt), perK: parsePerK(txt), acct: detectAccount(m, txt), keep: isKeptMsg(m, txt), shake: parseShake(txt)};
+            state.detailCache.set(m.shortCode, row);
+            if(row.keep && row.cum != null) store.put({c: m.shortCode, t: m.updateTime || '', a: row.acct, p: row.plant, u: row.cum, s: row.shake, k: row.perK});
+            results[i] = Object.assign({}, row, {m});
+          }catch(e){
+            results[i] = {m, cash: 0, items: 0, earn: null, plant: null, cum: null, acct: detectAccount(m, ''), keep: isKeptMsg(m, '')};
+          }
+          done++;
+          paint();
+        }
+      };
+      await Promise.all(Array.from({length: Math.min(8, n)}, worker));
+      paint(true);
+      store.save();   // 新解析的推送写入本地存档
+
+      const used = results.filter(r => r && r.keep);
+      const skipped = skippedHead + (results.length - used.length);
+      if(!used.length) throw new Error('没有匹配「种树完成」的消息');
+      const accts = new Map();
+      used.forEach(r => {
+        if(!r) return;
+        const name = r.acct || '未识别';
+        const date = (r.m.updateTime || '').slice(0,10) || '未知日期';
+        const t = r.m.updateTime || '';
+        const a = accts.get(name) || {name, count:0, earn:0, plant:0, fail:0, lastTime:'', lastCum:0, lastPlant:0, days:new Map()};
+        a.count++;
+        if(r.plant != null) a.plant = Math.max(a.plant, r.plant);
+        if(r.earn === null) a.fail++; else a.earn += r.earn;
+        if(r.cum != null && t >= a.lastTime){ a.lastTime = t; a.lastCum = r.cum; if(r.plant != null) a.lastPlant = r.plant; }
+        const d = a.days.get(date) || {date, count:0, earn:0, plant:0, lastTime:'', lastCum:0, lastPlant:0, msgs:[]};
+        d.count++;
+        if(r.plant != null) d.plant = Math.max(d.plant, r.plant);
+        d.earn += r.earn || 0;   // 先按推送内容收益暂存（下面会用累计收益增量覆盖）
+        d.msgs.push({t: t.slice(11,19) || t, earn: 0, cum: r.cum, plant: r.plant});
+        if(r.cum != null && t >= d.lastTime){ d.lastTime = t; d.lastCum = r.cum; if(r.plant != null) d.lastPlant = r.plant; }
+        a.days.set(date, d);
+        accts.set(name, a);
+      });
+      const accounts = [...accts.values()].map(a => {
+        const days = [...a.days.values()].sort((x,y) => x.date < y.date ? -1 : (x.date > y.date ? 1 : 0));
+        // 每条推送的盈亏 = 本条「累计收益」 − 上一条「累计收益」；当日收益 = 当天各条盈亏之和
+        // 当日种植数量同理：本条「已种植」 − 上一条「已种植」，按天求和（首条没有上一条，记 0）
+        let prevCum = null, prevPlant = null;
+        days.forEach(d => d.msgs.sort((x,y) => x.t < y.t ? -1 : (x.t > y.t ? 1 : 0)));
+        days.forEach(d => d.msgs.forEach(m => {
+          m.earn = (m.cum != null && prevCum != null) ? (m.cum - prevCum) : 0;
+          m.grow = (m.plant != null && prevPlant != null) ? Math.max(0, m.plant - prevPlant) : 0;
+          if(m.cum != null) prevCum = m.cum;
+          if(m.plant != null) prevPlant = m.plant;
+        }));
+        let dayEarn = 0, grow = 0;
+        days.forEach(d => {
+          d.earn = d.msgs.reduce((s,m) => s + m.earn, 0);
+          d.grow = d.msgs.reduce((s,m) => s + (m.grow || 0), 0);
+          d.msgs.forEach(m => { if(m.cum != null) d.lastCum = m.cum; });
+          dayEarn += d.earn;
+          grow += d.grow;
+        });
+        return {name:a.name, count:a.count, earn:a.earn, dayEarn, latestEarn: days.length ? days[days.length-1].earn : 0,
+          grow, latestGrow: days.length ? days[days.length-1].grow : 0,
+          plant:a.plant, fail:a.fail, lastCum:a.lastCum, lastPlant:a.lastPlant, days};
+      }).sort((x,y) => y.dayEarn - x.dayEarn);
+      state.daily = {accounts, filter:'all', skipped};
+      renderDailyResult();
+      $('dCsv').disabled = false; $('dMd').disabled = false;
+      setStatus(infoEl, `完成：${accounts.length} 个账号 / ${used.length} 条种树完成（明细 ${n} 条，已过滤 ${skipped} 条）`, 'ok');
+    }catch(err){
+      setStatus(infoEl, '统计失败：' + err.message, 'err');
+    }finally{
+      $('dRun').disabled = false;
+    }
+  }
+
+  function renderDailyResult(){
+    const box = $('dResult');
+    const accounts = (state.daily && state.daily.accounts) || [];
+    if(!accounts.length){ box.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+    const total = accounts.reduce((a,x) => ({count:a.count+x.count, earn:a.earn+x.earn, dayEarn:a.dayEarn+x.dayEarn, latestEarn:a.latestEarn+x.latestEarn, grow:a.grow+x.grow, latestGrow:a.latestGrow+x.latestGrow, plant:a.plant+x.plant, lastCum:a.lastCum+x.lastCum, lastPlant:a.lastPlant+x.lastPlant}), {count:0, earn:0, dayEarn:0, latestEarn:0, grow:0, latestGrow:0, plant:0, lastCum:0, lastPlant:0});
+    const sel = (state.daily && state.daily.filter) || 'all';
+
+    // 账号筛选
+    let h = '<div class="acctbar">账号：<select id="dAcct">' +
+      '<option value="all"' + (sel === 'all' ? ' selected' : '') + '>全部账号</option>' +
+      accounts.map(a => `<option value="${esc(a.name)}"${a.name === sel ? ' selected' : ''}>${esc(a.name)}（当日 ${fmt(a.latestEarn)}）</option>`).join('') +
+      '</select></div>';
+
+    // 账号总览（当日收益/当日种植 = 最新一天的数据）
+    h += '<table class="tbl"><tr><th>账号</th><th class="num">种植数量</th><th class="num">当日种植</th><th class="num key">当日收益</th><th class="num">累计收益</th><th class="num">平均收益</th></tr>' +
+      accounts.map(a => `<tr><td>${esc(a.name)}</td><td class="num">${a.plant} 棵</td><td class="num">${a.latestGrow} 棵</td><td class="num key">${fmtC(a.latestEarn)}</td><td class="num">${fmtC(a.lastCum)}</td><td class="num">${fmtC(avgPush(a))}</td></tr>`).join('') +
+      `<tr class="hl"><td>合计（${accounts.length} 个账号）</td><td class="num">${total.plant} 棵</td><td class="num">${total.latestGrow} 棵</td><td class="num key">${fmtC(total.latestEarn)}</td><td class="num">${fmtC(total.lastCum)}</td><td class="num">${fmtC(avgPush(total))}</td></tr></table>`;
+
+    // 每日汇总（所有账号合并）
+    const dayList = mergeDays(accounts);
+    h += `<h3>每日汇总（所有账号）<span class="sub">共 ${dayList.length} 天</span></h3>`;
+    h += '<table class="tbl"><tr><th>日期</th><th class="num">种植数量</th><th class="num">当日种植</th><th class="num key">当日收益</th><th class="num">平均收益</th></tr>' +
+      dayList.map(d => `<tr><td>${esc(d.date)}</td><td class="num">${d.plant} 棵</td><td class="num">${d.grow} 棵</td><td class="num key">${fmtC(d.earn)}</td><td class="num">${fmtC(avgPush(d))}</td></tr>`).join('') +
+      `<tr class="hl"><td>合计（${dayList.length} 天）</td><td class="num">${total.plant} 棵</td><td class="num">${total.grow} 棵</td><td class="num key">${fmtC(total.dayEarn)}</td><td class="num">${fmtC(avgPush(total))}</td></tr></table>`;
+
+    // 每个账号的每日明细
+    const show = sel === 'all' ? accounts : accounts.filter(a => a.name === sel);
+    show.forEach(a => {
+      h += `<h3>${esc(a.name)}<span class="sub">种植 ${a.plant} 棵 · 累计 ${fmtC(a.lastCum)} · 平均 ${fmtC(avgPush(a))}</span></h3>`;
+      h += '<table class="tbl"><tr><th>日期</th><th class="num">种植数量</th><th class="num">当日种植</th><th class="num key">当日收益</th><th class="num">累计收益</th><th class="num">平均收益</th></tr>';
+      a.days.forEach(d => {
+        h += `<tr><td>${esc(d.date)}</td><td class="num">${d.plant} 棵</td><td class="num">${d.grow} 棵</td><td class="num key">${fmtC(d.earn)}</td><td class="num">${fmtC(d.lastCum)}</td><td class="num">${fmtC(avgPush(d))}</td></tr>`;
+      });
+      h += `<tr class="hl"><td>小计</td><td class="num">${a.plant} 棵</td><td class="num">${a.grow} 棵</td><td class="num key">${fmtC(a.dayEarn)}</td><td class="num">${fmtC(a.lastCum)}</td><td class="num">${fmtC(avgPush(a))}</td></tr></table>`;
+      // 每条推送的盈亏明细（全部账号与单账号均显示），并带该日期「当日收益」列
+      h += `<h3>${esc(a.name)} · 每条推送盈亏<span class="sub">共 ${a.count} 条</span></h3>`;
+      h += '<table class="tbl"><tr><th>日期</th><th>时间</th><th class="num">累计收益</th><th class="num">本条盈亏</th><th class="num key">当日收益</th></tr>';
+      const rows = [];
+      a.days.forEach(d => d.msgs.forEach(m => {
+        rows.push(`<tr><td>${esc(d.date)}</td><td>${esc(m.t)}</td><td class="num">${m.cum == null ? '—' : fmtC(m.cum)}</td><td class="num">${fmtC(m.earn)}</td><td class="num key">${fmtC(d.earn)}</td></tr>`);
+      }));
+      h += rows.join('');
+      h += `<tr class="hl"><td>合计</td><td>${a.count} 条</td><td class="num">${fmtC(a.lastCum)}</td><td class="num">${fmtC(a.dayEarn)}</td><td class="num key">${fmtC(a.dayEarn)}</td></tr></table>`;
+    });
+
+    const skipped = (state.daily && state.daily.skipped) || 0;
+    h += '<div class="total">' +
+      `<div class="row"><span>账号数</span><span>${accounts.length}</span></div>` +
+      `<div class="row"><span>种植数量</span><span>${total.plant} 棵</span></div>` +
+      `<div class="row"><span>当日种植（最新一天）</span><span>${total.latestGrow} 棵</span></div>` +
+      (skipped ? `<div class="row"><span>已过滤其他消息</span><span>${skipped} 条</span></div>` : '') +
+      `<div class="row"><span>累计收益</span><span>${fmtC(total.lastCum)}</span></div>` +
+      `<div class="row"><span>平均收益</span><span>${fmtC(avgPush(total))}</span></div>` +
+      `<div class="big"><span>当日收益（最新一天）</span><b>${fmtC(total.latestEarn)}</b></div>` +
+      '</div>';
+
+    box.innerHTML = h;
+    const s2 = $('dAcct');
+    if(s2) s2.onchange = e => { state.daily.filter = e.target.value; renderDailyResult(); };
+  }
+
+  function exportDailyCsv(){
+    const accounts = (state.daily && state.daily.accounts) || [];
+    if(!accounts.length) return;
+    const W = v => num2(v);
+    const P = x => (x && x.plant > 0 ? x.plant : (x ? x.lastPlant : 0));
+    const A = x => (P(x) > 0 ? num2(x.lastCum / P(x)) : '');
+    const lines = ['账号,日期,种植数量,当日种植(棵),当日收益(万),累计收益(万),平均收益(万)'];
+    let tp = 0, tg = 0, tlatest = 0, tlc = 0;
+    accounts.forEach(a => {
+      a.days.forEach(d => lines.push([a.name, d.date, d.plant, d.grow, W(d.earn), W(d.lastCum), A(d)].join(',')));
+      lines.push([a.name + ' 小计', '', a.plant, a.grow, W(a.dayEarn), W(a.lastCum), A(a)].join(','));
+      tp += a.plant; tg += a.latestGrow; tlatest += a.latestEarn; tlc += a.lastCum;
+    });
+    lines.push(['总计', '', tp, tg, W(tlatest), W(tlc), (tp > 0 ? num2(tlc / tp) : '')].join(','));
+    const dl = mergeDays(accounts);
+    lines.push('');
+    lines.push('每日汇总（所有账号）');
+    lines.push('日期,种植数量,当日种植(棵),当日收益(万),平均收益(万)');
+    dl.forEach(d => lines.push([d.date, d.plant, d.grow, W(d.earn), A(d)].join(',')));
+    const blob = new Blob(['\ufeff' + lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'pushplus-accounts-' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    setStatus($('dInfo'), 'CSV 已导出', 'ok');
+  }
+
+  function copyDailyMarkdown(){
+    const accounts = (state.daily && state.daily.accounts) || [];
+    if(!accounts.length) return;
+    const total = accounts.reduce((a,x) => ({count:a.count+x.count, earn:a.earn+x.earn, dayEarn:a.dayEarn+x.dayEarn, latestEarn:a.latestEarn+x.latestEarn, grow:a.grow+x.grow, latestGrow:a.latestGrow+x.latestGrow, plant:a.plant+x.plant, lastCum:a.lastCum+x.lastCum, lastPlant:a.lastPlant+x.lastPlant}), {count:0, earn:0, dayEarn:0, latestEarn:0, grow:0, latestGrow:0, plant:0, lastCum:0, lastPlant:0});
+    const out = ['# 种树完成 · 按账号收益', '', '## 账号总览', '| 账号 | 种植数量 | 当日种植 | 当日收益 | 累计收益 | 平均收益 |', '|---|---|---|---|---|---|'];
+    accounts.forEach(a => out.push(`| ${a.name} | ${a.plant} 棵 | ${a.latestGrow} 棵 | ${fmt(a.latestEarn)} | ${fmt(a.lastCum)} | ${fmt(avgPush(a))} |`));
+    out.push(`| **合计（${accounts.length} 个账号）** | **${total.plant} 棵** | **${total.latestGrow} 棵** | **${fmt(total.latestEarn)}** | **${fmt(total.lastCum)}** | **${fmt(avgPush(total))}** |`);
+    out.push('', '## 每日汇总（所有账号）', '| 日期 | 种植数量 | 当日种植 | 当日收益 | 平均收益 |', '|---|---|---|---|---|');
+    mergeDays(accounts).forEach(d => out.push(`| ${d.date} | ${d.plant} 棵 | ${d.grow} 棵 | ${fmt(d.earn)} | ${fmt(avgPush(d))} |`));
+    accounts.forEach(a => {
+      out.push('', `## ${a.name}（种植 ${a.plant} 棵 · 累计 ${fmt(a.lastCum)} · 平均 ${fmt(avgPush(a))}）`, '| 日期 | 种植数量 | 当日种植 | 当日收益 | 累计收益 | 平均收益 |', '|---|---|---|---|---|---|');
+      a.days.forEach(d => out.push(`| ${d.date} | ${d.plant} 棵 | ${d.grow} 棵 | ${fmt(d.earn)} | ${fmt(d.lastCum)} | ${fmt(avgPush(d))} |`));
+      out.push(`| **小计** | **${a.plant} 棵** | **${a.grow} 棵** | **${fmt(a.dayEarn)}** | **${fmt(a.lastCum)}** | **${fmt(avgPush(a))}** |`);
+    });
+    navigator.clipboard.writeText(out.join('\n'))
+      .then(() => setStatus($('dInfo'), '已复制（Markdown）', 'ok'))
+      .catch(e => setStatus($('dInfo'), '复制失败：' + e.message, 'err'));
+  }
+
+  /* ---------- 事件 ---------- */
+  $('btnCfg').onclick = () => $('cfg').classList.toggle('hide');
+  $('btnRefresh').onclick = () => loadList(state.page, false, true);
+  $('btnDaily').onclick = () => { state.view = 'daily'; renderPane(); setStatus($('detailStatus'), ''); };
+
+  $('btnSave').onclick = async () => {
+    state.token  = $('token').value.trim();
+    state.secret = $('secret').value.trim();
+    saveCfg();
+    state.accessKey = ''; state.keyExp = 0;
+    setStatus($('cfgStatus'), '连接中…');
+    try{
+      await ensureKey(true);
+      $('cfg').classList.add('hide');
+      $('btnRefresh').disabled = false;
+      setStatus($('cfgStatus'), '连接成功', 'ok');
+      loadList(1);
+    }catch(err){
+      setStatus($('cfgStatus'), err.message, 'err');
+    }
+  };
+
+  $('btnClear').onclick = () => {
+    state.token = state.secret = state.accessKey = '';
+    state.keyExp = 0; state.list = []; state.rawHtml = ''; state.plainText = ''; state.sel = null;
+    state.daily = null; state.view = 'detail';
+    state.seenCodes.clear(); state.freshCodes.clear(); state.listReady = false;
+    state.acctLast.clear(); state.alerted.clear();
+    try{
+      localStorage.removeItem('pp_token'); localStorage.removeItem('pp_secret');
+      localStorage.removeItem('pp_acct_last');
+    }catch(e){}
+    $('token').value = ''; $('secret').value = '';
+    $('who').textContent = '';
+    $('btnRefresh').disabled = true;
+    $('btnDaily').disabled = true;
+    $('btnRaw').disabled = true;
+    $('btnCopySum').disabled = true;
+    $('detailTitle').textContent = '未选择消息';
+    $('list').innerHTML = '';
+    $('pane').innerHTML = '<div class="empty">左侧选择一条推送消息</div>';
+    setStatus($('cfgStatus'), '已清空', 'warn');
+    setStatus($('listStatus'), '');
+    setStatus($('detailStatus'), '');
+  };
+
+  $('btnIp').onclick = async () => {
+    const el = $('cfgStatus');
+    setStatus(el, '检测中…');
+    const urls = ['https://api.ipify.org?format=json', 'https://ipinfo.io/json', 'https://api64.ipify.org?format=json'];
+    for(const u of urls){
+      try{
+        const j = await (await netFetch(u)).json();
+        if(j.ip){ setStatus(el, '本机公网 IP：' + j.ip + '（请加入安全 IP 列表）', 'ok'); return; }
+      }catch(e){}
+    }
+    setStatus(el, '无法自动检测，请自行搜索「我的IP」', 'warn');
+  };
+
+  $('btnRaw').onclick = () => {
+    state.showRaw = !state.showRaw;
+    $('btnRaw').textContent = state.showRaw ? '收起原文' : '查看原文';
+    renderPane();
+  };
+
+  $('btnCopySum').onclick = async () => {
+    const m = state.sel || {};
+    const earn = isFilteredMsg(m) ? null : parseEarn(state.plainText);
+    const plant = isFilteredMsg(m) ? null : parsePlant(state.plainText);
+    const cum = isFilteredMsg(m) ? null : parseCum(state.plainText);
+    const line = (m.title || '') + ' ' + (m.updateTime || '') + ' 收益：' + (earn === null ? '已过滤' : fmt(earn)) +
+      (plant != null ? ' 种植：' + plant + ' 棵 平均：' + fmt(avgPush({lastPlant:plant, lastCum:cum})) : '');
+    try{ await navigator.clipboard.writeText(line.trim()); setStatus($('detailStatus'), '收益已复制', 'ok'); }
+    catch(e){ setStatus($('detailStatus'), '复制失败：' + e.message, 'err'); }
+  };
+
+  $('kw').oninput = e => { state.kw = e.target.value; renderList(); };
+  $('size').onchange = e => { state.size = Number(e.target.value); loadList(1); };
+  $('prev').onclick = () => { if(state.page > 1) loadList(state.page - 1); };
+  $('next').onclick = () => { if(state.page < state.pages) loadList(state.page + 1); };
+
+  $('autoSec').onchange = () => {
+    try{ localStorage.setItem('pp_autoSec', $('autoSec').value); }catch(e){}
+    setupAuto();
+  };
+  $('alertMin').onchange = () => {
+    try{ localStorage.setItem('pp_alertMin', $('alertMin').value); }catch(e){}
+    state.alerted.clear();   // 阈值变化后重新判定
+    checkStale();
+  };
+  $('alertCustom').onchange = () => {
+    try{ localStorage.setItem('pp_alertCustom', $('alertCustom').value); }catch(e){}
+    state.alerted.clear();
+    checkStale();
+  };
+  $('keepDays').onchange = () => {
+    const d = Math.max(1, Math.min(90, Number($('keepDays').value) || 7));
+    $('keepDays').value = d;
+    try{ localStorage.setItem('pp_keepDays', d); }catch(e){}
+    const removed = store.prune() + pruneFull();
+    store.save();
+    setStatus($('listStatus'), removed ? `已清理 ${removed} 条过期存档（保留 ${d} 天）` : `本地存档保留 ${d} 天`, removed ? 'warn' : 'ok');
+  };
+  $('warnOk').onclick = () => $('warnMask').classList.add('hide');
+  $('warnMask').onclick = e => { if(e.target === $('warnMask')) $('warnMask').classList.add('hide'); };
+  $('shakeOk').onclick = () => $('shakeMask').classList.add('hide');
+  $('shakeMask').onclick = e => { if(e.target === $('shakeMask')) $('shakeMask').classList.add('hide'); };
+  // 每分钟检查一次：只读取最新一页判断各账号推送时间，不刷新列表、不触发自动读取
+  setInterval(() => {
+    if($('btnRefresh').disabled) return;
+    if(alertThreshold() > 0) refreshLatest();
+  }, 60000);
+
+  /* ---------- 初始化 ---------- */
+  store.load();   // 载入本地消息存档（旧推送不再重复请求）
+  loadFull();     // 载入已读列表缓存
+  loadAcctLast(); // 恢复各账号最新推送时间（跨刷新判断超时）
+  seedAcctFromFull();
+  loadCfg();
+  loadAutoCfg();
+  pruneFull();
+  if(state.token && state.secret){
+    ensureKey(true)
+      .then(() => { $('btnRefresh').disabled = false; loadList(1); })
+      .catch(err => { $('cfg').classList.remove('hide'); setStatus($('cfgStatus'), err.message, 'err'); });
+  }else{
+    $('cfg').classList.remove('hide');
+    setStatus($('cfgStatus'), '请先填写 token 与 secretKey', 'warn');
+  }
+})();
+</script>
+</body>
+</html>
