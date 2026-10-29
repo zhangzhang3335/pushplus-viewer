@@ -72,8 +72,13 @@
   header .acts button#btnMute.muted:hover{opacity:.85;background:rgba(239,68,68,.22)}
   .wrap{display:grid;grid-template-columns:372px 1fr;overflow:hidden;
     height:calc(100vh - 62px);height:calc(100dvh - 62px)}
-  .left{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:rgba(15,21,32,.55)}
-  .right{display:flex;flex-direction:column;min-height:0}
+  .left{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0;
+    background:rgba(15,21,32,.55)}
+  .left .cfg{flex-shrink:0}
+  .left .bar{flex-shrink:0}
+  .left .pager{flex-shrink:0}
+  .left .status{flex-shrink:0}
+  .right{display:flex;flex-direction:column;min-height:0;min-width:0}
   .bar{display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
   .list{overflow:auto;flex:1;padding:4px 0}
   .msg{padding:11px 14px;border-bottom:1px solid rgba(42,52,72,.6);border-left:3px solid transparent;cursor:pointer;
@@ -97,9 +102,11 @@
   .pager button{padding:4px 12px;font-size:12px;border-radius:7px}
   .pane{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto;scroll-behavior:smooth}
   .bigcard{margin:18px;padding:26px;background:linear-gradient(165deg,#202a3d,#161d2c);border:1px solid var(--line);
-    border-radius:14px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+    border-radius:14px;box-shadow:var(--shadow);position:relative;overflow:visible}
+  .bigcard::before{content:"";position:absolute;inset:0;border-radius:14px;pointer-events:none;
+    background:linear-gradient(165deg,#202a3d,#161d2c);z-index:-1}
   .bigcard::after{content:"";position:absolute;left:0;top:0;width:100%;height:2px;
-    background:linear-gradient(90deg,var(--acc),rgba(34,197,94,.7),transparent 80%)}
+    background:linear-gradient(90deg,var(--acc),rgba(34,197,94,.7),transparent 80%);border-radius:14px 14px 0 0;pointer-events:none}
   .bigcard .cap{font-size:12px;color:var(--sub);letter-spacing:.6px}
   .bigcard b{display:block;margin:8px 0 10px;font-size:40px;line-height:1.1;color:var(--ok);
     font-variant-numeric:tabular-nums;text-shadow:0 2px 20px rgba(34,197,94,.25)}
@@ -144,9 +151,10 @@
   table.tbl tr.hl td.key{font-size:25px;color:#0b1220}
   table.tbl tr:hover td.key{background:#8ac4ff}
   /* 每日收益矩阵（账号 × 日期） */
-  table.tbl.mat{margin-top:6px;border-radius:10px;overflow:hidden;background:rgba(12,18,28,.6);border:1px solid rgba(80,100,140,.3);table-layout:auto}
-  table.tbl.mat thead th{background:linear-gradient(180deg,#1a2336,#131a2a);font-size:13px;font-weight:700;letter-spacing:.4px}
+  table.tbl.mat{margin-top:6px;border-radius:10px;background:rgba(12,18,28,.6);border:1px solid rgba(80,100,140,.3);table-layout:auto;border-collapse:separate;border-spacing:0}
+  table.tbl.mat thead th{background:linear-gradient(180deg,#1a2336,#131a2a);font-size:13px;font-weight:700;letter-spacing:.4px;position:sticky;top:0;z-index:4}
   table.tbl.mat .mat-acct{position:sticky;left:0;background:rgba(15,21,32,.98);font-weight:700;color:#c9d6ee;z-index:3;border-right:2px solid rgba(110,130,170,.25)}
+  table.tbl.mat thead th.mat-acct{z-index:5;background:linear-gradient(180deg,#1a2336,#131a2a)}
   table.tbl.mat .mat-day{text-align:center;color:#ffd479;font-weight:700;padding:10px 6px;white-space:nowrap}
   table.tbl.mat tbody td{text-align:center;padding:10px 6px;vertical-align:middle}
   table.tbl.mat td.mat-cell{background:#6bb2ff;color:#0b1220;font-size:18px;font-weight:800;letter-spacing:.3px;
@@ -166,10 +174,12 @@
   table.tbl.mat tr:hover td.mat-col.mat-total{background:#5aa3ff}
   table.tbl.mat tr:hover td.mat-acct{background:rgba(15,21,32,1)}
   table.tbl.mat tr.hl.mat-footer:hover .mat-cell{background:#ffe08f}
-  /* 窄屏适配：矩阵表头竖排 */
+  /* 窄屏适配：矩阵可横向滚动，表头竖排 */
   @media (max-width:1180px){
-    table.tbl.mat{display:block;overflow-x:auto;max-width:100%}
+    table.tbl.mat{display:block;overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
     table.tbl.mat .mat-day{writing-mode:vertical-rl;text-orientation:mixed;padding:4px 8px;height:64px}
+    table.tbl.mat .mat-acct{position:relative !important;left:auto !important}
+    table.tbl.mat thead th.mat-acct{position:relative !important}
   }
   .dialog .names{display:block;margin-top:6px;color:var(--warn);font-size:14px;word-break:break-all}
   table.tbl tr.hl td{color:var(--gold);font-weight:600}
@@ -232,15 +242,9 @@
   .dialog.raw .rawBody{flex:1;min-height:120px;overflow:auto;background:rgba(8,12,20,.6);border:1px solid var(--line);border-radius:10px;padding:14px}
   .dialog.raw pre{margin:0;white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.75;color:var(--txt);font-family:inherit}
   .dialog.raw .acts{margin-top:14px}
-  /* 响应式：窄屏收窄侧栏，手机竖屏上下堆叠 */
+  /* 响应式：断点从大到小依次覆盖 */
   @media (max-width:1180px){ .wrap{grid-template-columns:330px 1fr} header .quote{font-size:clamp(13px,1.7vw,21px)} }
   @media (max-width:900px){ header .sp{display:none} }
-  @media (max-width:640px){
-    header{padding:10px 12px;gap:10px;flex-wrap:wrap;height:auto}
-    header .who{display:none}
-    header .acts{margin-left:auto;padding-left:0;border-left:0;gap:6px}
-    header .acts button{padding:0 10px;font-size:12px}
-  }
   @media (max-width:860px){
     body{overflow:auto}
     .wrap{grid-template-columns:1fr;height:auto;overflow:visible}
@@ -248,6 +252,12 @@
     .list{max-height:46vh}
     .pane{overflow:visible}
     header{position:static}
+  }
+  @media (max-width:640px){
+    header{padding:10px 12px;gap:10px;flex-wrap:wrap;height:auto}
+    header .who{display:none}
+    header .acts{margin-left:auto;padding-left:0;border-left:0;gap:6px}
+    header .acts button{padding:0 10px;font-size:12px}
   }
 </style>
 </head>
