@@ -78,7 +78,9 @@
   .msg .t{font-weight:600;margin-bottom:2px;word-break:break-all;font-size:14px;line-height:1.45}
   .msg .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:middle;
     box-shadow:0 0 8px rgba(34,197,94,.8)}
-  .msg .m{font-size:12px;color:var(--sub);display:flex;gap:10px;flex-wrap:wrap}
+  .msg .m{font-size:12px;color:var(--sub);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .msg .m .ago{margin-left:auto;color:#ffd479;background:rgba(255,212,121,.1);padding:1px 8px;border-radius:999px;font-size:11px;white-space:nowrap}
+  .msg .m .ago.just{color:#9ae6b4;background:rgba(72,187,120,.15)}
   .msg .metaline{font-size:12px;color:var(--sub);margin-top:6px;font-variant-numeric:tabular-nums;
     display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
   .msg .metaline b{font-weight:600;color:#dbe6ff}
@@ -523,8 +525,10 @@
   const fmt = n => num2(n) + '万';
   const signCls = n => (Number(n) < 0 ? 'neg' : 'pos');          // 负=红，正=绿
   const fmtC = n => '<span class="' + signCls(n) + '">' + fmt(n) + '</span>';
-  // 平均收益 = 推送原文的「累计收益」÷「已种植」；优先用显示口径的种植数量(plant)，退回最新值(lastPlant)
+  // 账号级总平均 = 累计收益 ÷ 总种植棵数（历史累计口径，用于账号总览/小计）
   const avgPush = x => { if(!x) return 0; const p = (x.plant > 0 ? x.plant : x.lastPlant); return p > 0 ? x.lastCum / p : 0; };
+  // 每日级当日平均 = 当日收益 ÷ 当日种植（用于每日汇总表/账号每天的明细行）
+  const avgDaily = x => { if(!x) return 0; const g = x.grow > 0 ? x.grow : (x.latestGrow || 0); const e = x.earn != null ? x.earn : (x.dayEarn || 0); return g > 0 ? e / g : 0; };
   // 把各账号的「日期」明细合并成「每天所有账号」汇总（按日期升序，并累加当日收益/当日种植）
   function mergeDays(accounts){
     const map = new Map();
@@ -1025,7 +1029,7 @@
         const isNew = state.freshCodes.has(code);
         return `<div class="msg${active}" data-code="${esc(code)}">
           <div class="t">${isNew ? '<span class="dot"></span>' : ''}${esc(m.title || '(无标题)')}</div>
-          <div class="m"><span>${esc(m.updateTime||'')}</span><span>${esc(m.channel||'')}</span></div>
+          <div class="m"><span>${esc(m.updateTime||'')}</span><span>${esc(m.channel||'')}</span>${timeAgo(m.updateTime)}</div>
           ${metaLine(metaOf(code))}
         </div>`;
       }).join('');
@@ -1042,7 +1046,20 @@
     renderList();
     box.scrollTop = top;
   }
-  // 某条消息的已知概要：内存缓存优先，其次本地存档（没解析过则返回 null，不瞎猜）
+  // 把 "2026-10-29 23:38:52" 这样的时间戳转为 "X 分钟前 / X 小时前 / X 天前"
+  function timeAgo(ts){
+    if(!ts) return '';
+    // 服务端返回的可能是北京时间，也可能是 UTC（少 8 小时），这里一律按本地时间直接解析
+    const t = Date.parse(ts.replace(' ', 'T'));
+    if(isNaN(t)) return '';
+    const diff = (Date.now() - t) / 1000;
+    if(diff < 0) return '';                     // 时间还早（跨时区），不显示
+    if(diff < 60) return '<span class="ago just">刚刚</span>';
+    if(diff < 3600) return `<span class="ago">${Math.floor(diff/60)} 分钟前</span>`;
+    if(diff < 86400) return `<span class="ago">${Math.floor(diff/3600)} 小时前</span>`;
+    if(diff < 86400*7) return `<span class="ago">${Math.floor(diff/86400)} 天前</span>`;
+    return '';   // 超过 7 天不再显示
+  }
   function metaOf(code){
     const hit = state.detailCache.get(code);
     if(hit && (hit.plant != null || hit.perK != null || hit.shake != null))
@@ -1560,8 +1577,8 @@
     const dayList = mergeDays(accounts);
     h += `<h3>每日汇总（所有账号）<span class="sub">共 ${dayList.length} 天</span></h3>`;
     h += '<table class="tbl"><tr><th>日期</th><th class="num">种植数量</th><th class="num">当日种植</th><th class="num key">当日收益</th><th class="num">平均收益</th></tr>' +
-      dayList.map(d => `<tr><td>${esc(d.date)}</td><td class="num">${d.plant} 棵</td><td class="num">${d.grow} 棵</td><td class="num key">${fmtC(d.earn)}</td><td class="num">${fmtC(avgPush(d))}</td></tr>`).join('') +
-      `<tr class="hl"><td>合计（${dayList.length} 天）</td><td class="num">${(dayList.length ? dayList[dayList.length-1].plant : total.plant)} 棵</td><td class="num">${total.grow} 棵</td><td class="num key">${fmtC(total.dayEarn)}</td><td class="num">${fmtC(avgPush(total))}</td></tr></table>`;
+      dayList.map(d => `<tr><td>${esc(d.date)}</td><td class="num">${d.plant} 棵</td><td class="num">${d.grow} 棵</td><td class="num key">${fmtC(d.earn)}</td><td class="num">${fmtC(avgDaily(d))}</td></tr>`).join('') +
+      `<tr class="hl"><td>合计（${dayList.length} 天）</td><td class="num">${(dayList.length ? dayList[dayList.length-1].plant : total.plant)} 棵</td><td class="num">${total.grow} 棵</td><td class="num key">${fmtC(total.dayEarn)}</td><td class="num">${fmtC(avgDaily(total))}</td></tr></table>`;
 
     // 每个账号的每日明细
     const show = sel === 'all' ? accounts : accounts.filter(a => a.name === sel);
@@ -1569,7 +1586,7 @@
       h += `<h3>${esc(a.name)}<span class="sub">种植 ${a.plant} 棵 · 累计 ${fmtC(a.lastCum)} · 平均 ${fmtC(avgPush(a))}</span></h3>`;
       h += '<table class="tbl"><tr><th>日期</th><th class="num">种植数量</th><th class="num">当日种植</th><th class="num key">当日收益</th><th class="num">累计收益</th><th class="num">平均收益</th></tr>';
       a.days.forEach(d => {
-        h += `<tr><td>${esc(d.date)}</td><td class="num">${d.plant} 棵</td><td class="num">${d.grow} 棵</td><td class="num key">${fmtC(d.earn)}</td><td class="num">${fmtC(d.lastCum)}</td><td class="num">${fmtC(avgPush(d))}</td></tr>`;
+        h += `<tr><td>${esc(d.date)}</td><td class="num">${d.plant} 棵</td><td class="num">${d.grow} 棵</td><td class="num key">${fmtC(d.earn)}</td><td class="num">${fmtC(d.lastCum)}</td><td class="num">${fmtC(avgDaily(d))}</td></tr>`;
       });
       h += `<tr class="hl"><td>小计</td><td class="num">${a.plant} 棵</td><td class="num">${a.grow} 棵</td><td class="num key">${fmtC(a.dayEarn)}</td><td class="num">${fmtC(a.lastCum)}</td><td class="num">${fmtC(avgPush(a))}</td></tr></table>`;
       // 每条推送的盈亏明细（全部账号与单账号均显示），并带该日期「当日收益」列
@@ -1607,10 +1624,10 @@
     accounts.forEach(a => out.push(`| ${a.name} | ${a.plant} 棵 | ${a.latestGrow} 棵 | ${fmt(a.latestEarn)} | ${fmt(a.lastCum)} | ${fmt(avgPush(a))} |`));
     out.push(`| **合计（${accounts.length} 个账号）** | **${total.plant} 棵** | **${total.latestGrow} 棵** | **${fmt(total.latestEarn)}** | **${fmt(total.lastCum)}** | **${fmt(avgPush(total))}** |`);
     out.push('', '## 每日汇总（所有账号）', '| 日期 | 种植数量 | 当日种植 | 当日收益 | 平均收益 |', '|---|---|---|---|---|');
-    mergeDays(accounts).forEach(d => out.push(`| ${d.date} | ${d.plant} 棵 | ${d.grow} 棵 | ${fmt(d.earn)} | ${fmt(avgPush(d))} |`));
+    mergeDays(accounts).forEach(d => out.push(`| ${d.date} | ${d.plant} 棵 | ${d.grow} 棵 | ${fmt(d.earn)} | ${fmt(avgDaily(d))} |`));
     accounts.forEach(a => {
       out.push('', `## ${a.name}（种植 ${a.plant} 棵 · 累计 ${fmt(a.lastCum)} · 平均 ${fmt(avgPush(a))}）`, '| 日期 | 种植数量 | 当日种植 | 当日收益 | 累计收益 | 平均收益 |', '|---|---|---|---|---|---|');
-      a.days.forEach(d => out.push(`| ${d.date} | ${d.plant} 棵 | ${d.grow} 棵 | ${fmt(d.earn)} | ${fmt(d.lastCum)} | ${fmt(avgPush(d))} |`));
+      a.days.forEach(d => out.push(`| ${d.date} | ${d.plant} 棵 | ${d.grow} 棵 | ${fmt(d.earn)} | ${fmt(d.lastCum)} | ${fmt(avgDaily(d))} |`));
       out.push(`| **小计** | **${a.plant} 棵** | **${a.grow} 棵** | **${fmt(a.dayEarn)}** | **${fmt(a.lastCum)}** | **${fmt(avgPush(a))}** |`);
     });
     navigator.clipboard.writeText(out.join('\n'))
