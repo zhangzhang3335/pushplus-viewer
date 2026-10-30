@@ -308,7 +308,7 @@
 </div>
 <script>
 (function(){
-  /* ---------- 激活码验证（纯前端，哈希比对） ---------- */
+  /* ---------- 激活码验证（纯前端，哈希比对 + 本机设备指纹绑定） ---------- */
   const LIC_HASHES = [
     '84dd398931c56662ee3295291e062f9285f0f04ba20f9d3cd5d103a76d43270e',
     'e1a23c8c473b701ff16aa04e5e04bdde7cb8481365ee233d5731ae4c2054e8c5',
@@ -320,26 +320,57 @@
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
     return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
   }
+  /* 采集本机特征生成设备指纹（UA + 屏幕 + 时区 + Canvas 文本渲染） */
+  function makeDeviceId(){
+    let canvasTxt = '';
+    try {
+      const c = document.createElement('canvas'); c.width=120; c.height=40;
+      const ctx = c.getContext('2d');
+      ctx.textBaseline = 'top'; ctx.font = '14px Arial';
+      ctx.fillStyle = '#f60'; ctx.fillRect(0,0,120,40);
+      ctx.fillStyle = '#069'; ctx.fillText('PUSHplus 梦幻种树 2026', 2, 2);
+      ctx.strokeStyle = 'rgba(102,204,0,0.9)'; ctx.strokeText('fingerprint', 4, 18);
+      canvasTxt = c.toDataURL();
+    } catch(e){}
+    const raw = navigator.userAgent + '|' + screen.width + 'x' + screen.height +
+      '|' + (new Date().getTimezoneOffset()) + '|' + (navigator.language||'') +
+      '|' + (navigator.platform||'') + '|' + canvasTxt.slice(0,500);
+    // 用一个固定长度 hash 作设备 ID
+    let h = 0; for(let i=0;i<raw.length;i++){ h = ((h<<5)-h + raw.charCodeAt(i))|0; }
+    // 转成稳定的 8 字符十六进制
+    return 'd' + (h>>>0).toString(16).padStart(8,'0');
+  }
   function showMain(){ document.getElementById('licenseGate').classList.add('hide'); }
-  function hideMain(){ document.getElementById('licenseGate').classList.remove('hide'); }
   async function tryActivate(){
     const code = (document.getElementById('licInput').value || '').trim().toUpperCase();
     const err = document.getElementById('licErr');
     if(!/^PPV-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)){ err.textContent = '格式错误，示例：PPV-XXXX-XXXX-XXXX'; return; }
     const h = await sha256(code);
-    if(LIC_HASHES.includes(h)){
-      localStorage.setItem('pp_license', code);
-      err.textContent = '';
-      showMain();
-    }else{
-      err.textContent = '激活码错误，请检查后重试';
+    if(!LIC_HASHES.includes(h)){ err.textContent = '激活码错误，请检查后重试'; return; }
+    const deviceId = makeDeviceId();
+    // 本浏览器已经绑定了别的码
+    const oldCode = localStorage.getItem('pp_license');
+    const oldBind = localStorage.getItem('pp_deviceId');
+    if(oldCode && oldBind && oldBind !== deviceId){
+      // 设备指纹变了（同浏览器指纹变的概率极低），或者想在同一浏览器用不同码
+      err.textContent = '本设备已绑定其他激活码'; return;
     }
+    localStorage.setItem('pp_license', code);
+    localStorage.setItem('pp_deviceId', deviceId);
+    err.textContent = '';
+    showMain();
   }
   document.getElementById('licBtn').onclick = tryActivate;
   document.getElementById('licInput').addEventListener('keydown', e => { if(e.key === 'Enter') tryActivate(); });
-  // 启动检查：已激活则直接放行
-  const saved = localStorage.getItem('pp_license');
-  if(saved){ sha256(saved.toUpperCase()).then(h => { if(LIC_HASHES.includes(h)) showMain(); }); }
+  // 启动检查：已激活且设备指纹匹配才放行
+  (async function init(){
+    const saved = localStorage.getItem('pp_license');
+    const savedDev = localStorage.getItem('pp_deviceId');
+    if(saved && savedDev){
+      const h = await sha256(saved.toUpperCase());
+      if(LIC_HASHES.includes(h) && savedDev === makeDeviceId()) showMain();
+    }
+  })();
 })();
 </script>
 
