@@ -1761,10 +1761,23 @@
         if(!cur || t >= cur.t) base.set(name, {t, cum: r.cum, plant: r.plant});
       });
       const accts = new Map();
+      // 把 pushplus 的 updateTime 统一转成北京时间日期字符串（处理各种时区格式）
+      function toBjDate(str){
+        if(!str) return '未知日期';
+        // 如果不带时区（如 "2026-10-31 23:38:52"），当作北京时间处理
+        if(!/[Zz]|[+-]\d{2}:\d{2}$/.test(str)){
+          return str.slice(0,10);
+        }
+        // 带时区 → 用 Date 解析后转北京时间
+        const d = new Date(str);
+        if(isNaN(d)) return str.slice(0,10);
+        const bj = new Date(d.getTime() + 8*3600*1000);
+        return bj.getUTCFullYear() + '-' + String(bj.getUTCMonth()+1).padStart(2,'0') + '-' + String(bj.getUTCDate()).padStart(2,'0');
+      }
       used.forEach(r => {
         if(!r) return;
         const name = r.acct || '未识别';
-        const date = (r.m.updateTime || '').slice(0,10) || '未知日期';
+        const date = toBjDate(r.m.updateTime) || '未知日期';
         const t = r.m.updateTime || '';
         const a = accts.get(name) || {name, count:0, earn:0, plant:0, fail:0, lastTime:'', lastCum:0, lastPlant:0, days:new Map()};
         a.count++;
@@ -1781,10 +1794,15 @@
         accts.set(name, a);
       });
       // 「当天」以北京时间今天为准；今天没推送的账号，当日收益/种植按 0 计算
+      // 注意：不能用 toISOString().slice(0,10) 拿日期——那是 UTC 日期，凌晨 0-8 点会错一天
       const cnToday = (() => {
-        const d = new Date();
-        const utc = d.getTime() + d.getTimezoneOffset() * 60000;
-        return new Date(utc + 8*3600*1000).toISOString().slice(0,10);
+        const now = new Date();
+        // 把 UTC 毫秒 + 8 小时 → Date 对象内部存 UTC+8 的毫秒 → getUTC*/拼出来就是北京时间
+        const bj = new Date(now.getTime() + 8*3600*1000);
+        const y = bj.getUTCFullYear();
+        const m = String(bj.getUTCMonth()+1).padStart(2,'0');
+        const d = String(bj.getUTCDate()).padStart(2,'0');
+        return `${y}-${m}-${d}`;
       })();
       const accounts = [...accts.values()].map(a => {
         const days = [...a.days.values()].sort((x,y) => x.date < y.date ? -1 : (x.date > y.date ? 1 : 0));
