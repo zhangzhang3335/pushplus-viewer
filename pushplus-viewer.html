@@ -308,37 +308,27 @@
 </div>
 <script>
 (function(){
-  /* ---------- 激活码验证（纯前端，哈希比对 + 本机设备指纹绑定） ---------- */
+  /* ---------- 激活码验证（纯前端，哈希比对） ---------- */
   const LIC_HASHES = [
     '84dd398931c56662ee3295291e062f9285f0f04ba20f9d3cd5d103a76d43270e',
     'e1a23c8c473b701ff16aa04e5e04bdde7cb8481365ee233d5731ae4c2054e8c5',
     'a48be2fcce9045394260ab683fff45c1583ed877fe1a4fb71e70b4e2e8722480',
     'c111d9a3ee9b6b3924d9d1a6afdf0a134cbc9523877e2e9a57154da8f1acf34a',
-    'c1107abad3cec98ff1f32e3b882efca4104e7671225a4a9950c2a50c9f1c946e'
+    'c1107abad3cec98ff1f32e3b882efca4104e7671225a4a9950c2a50c9f1c946e',
+    'b76c5bbaeb860462ba448b9f2e4491fffe32e0be9959f30259324f1306baa2eb',
+    '8eee5eee1503a5275fc4bde65e95cd2352d4aab67763e755abcbf249e730f7a4',
+    '88bce0c3e5dd55c9dad8048d566549a9e9af27ff16e225f51074af03e74bab18',
+    'c89f6da0a112a85f37aceb85dfbdf8ac1a0bc86dbafaba0b8c0a9c6199fd8927',
+    'd8ca01ab0e19dbe7c3f311d15e6a926b627eaf55884d1b34313b1f66716ca4bc',
+    'c516b039e92a7065dd72b0e9d6c2e13cf7212cbe3460690226ff54a0b5ec6c47',
+    '42706c873f5d411611a9c6fbdcc1b9b625e65f3fe57a71e087f665ff1c75d473',
+    '6b1bdb9cbec31eff09837b570a0a934d580dd8eeca4a3155e81924f2504f3fdd',
+    '78c0aafee8f80a2d2fc2d128d00bf0f02ccb75046a519e068e340a5e17fe4ee8',
+    'b3738057140fb1a691cc860b2eb53b7adb08509aaa1067db9058214c691015d2'
   ];
   async function sha256(str){
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
     return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
-  }
-  /* 采集本机特征生成设备指纹（UA + 屏幕 + 时区 + Canvas 文本渲染） */
-  function makeDeviceId(){
-    let canvasTxt = '';
-    try {
-      const c = document.createElement('canvas'); c.width=120; c.height=40;
-      const ctx = c.getContext('2d');
-      ctx.textBaseline = 'top'; ctx.font = '14px Arial';
-      ctx.fillStyle = '#f60'; ctx.fillRect(0,0,120,40);
-      ctx.fillStyle = '#069'; ctx.fillText('PUSHplus 梦幻种树 2026', 2, 2);
-      ctx.strokeStyle = 'rgba(102,204,0,0.9)'; ctx.strokeText('fingerprint', 4, 18);
-      canvasTxt = c.toDataURL();
-    } catch(e){}
-    const raw = navigator.userAgent + '|' + screen.width + 'x' + screen.height +
-      '|' + (new Date().getTimezoneOffset()) + '|' + (navigator.language||'') +
-      '|' + (navigator.platform||'') + '|' + canvasTxt.slice(0,500);
-    // 用一个固定长度 hash 作设备 ID
-    let h = 0; for(let i=0;i<raw.length;i++){ h = ((h<<5)-h + raw.charCodeAt(i))|0; }
-    // 转成稳定的 8 字符十六进制
-    return 'd' + (h>>>0).toString(16).padStart(8,'0');
   }
   function showMain(){ document.getElementById('licenseGate').classList.add('hide'); }
   async function tryActivate(){
@@ -347,28 +337,20 @@
     if(!/^PPV-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)){ err.textContent = '格式错误，示例：PPV-XXXX-XXXX-XXXX'; return; }
     const h = await sha256(code);
     if(!LIC_HASHES.includes(h)){ err.textContent = '激活码错误，请检查后重试'; return; }
-    const deviceId = makeDeviceId();
-    // 本浏览器已经绑定了别的码
-    const oldCode = localStorage.getItem('pp_license');
-    const oldBind = localStorage.getItem('pp_deviceId');
-    if(oldCode && oldBind && oldBind !== deviceId){
-      // 设备指纹变了（同浏览器指纹变的概率极低），或者想在同一浏览器用不同码
-      err.textContent = '本设备已绑定其他激活码'; return;
-    }
     localStorage.setItem('pp_license', code);
-    localStorage.setItem('pp_deviceId', deviceId);
+    localStorage.removeItem('pp_deviceId');
     err.textContent = '';
     showMain();
   }
   document.getElementById('licBtn').onclick = tryActivate;
   document.getElementById('licInput').addEventListener('keydown', e => { if(e.key === 'Enter') tryActivate(); });
-  // 启动检查：已激活且设备指纹匹配才放行
+  // 启动检查：码有效即放行（不再校验设备指纹）
   (async function init(){
     const saved = localStorage.getItem('pp_license');
-    const savedDev = localStorage.getItem('pp_deviceId');
-    if(saved && savedDev){
+    if(saved){
       const h = await sha256(saved.toUpperCase());
-      if(LIC_HASHES.includes(h) && savedDev === makeDeviceId()) showMain();
+      if(LIC_HASHES.includes(h)) showMain();
+      else localStorage.removeItem('pp_license');
     }
   })();
 })();
@@ -1831,9 +1813,11 @@
         const lastDate = days.length ? days[days.length-1].date : null;
         const daysSinceLast = lastDate ? Math.floor((new Date(cnToday) - new Date(lastDate)) / 86400000) : 9999;
         const isInactive = daysSinceLast > 3;
+        // 当日收益/当日种植 = **只有今天的推送**才计数，今天没推送就是 0
+        const todayObj = days.find(d => d.date === cnToday) || {earn:0, grow:0};
         return {name:a.name, count:a.count, earn:a.earn, dayEarn,
-          latestEarn: hasToday ? days[days.length-1].earn : 0,
-          grow, latestGrow: hasToday ? days[days.length-1].grow : 0,
+          latestEarn: todayObj.earn,
+          grow, latestGrow: todayObj.grow,
           plant:a.plant, fail:a.fail, lastCum:a.lastCum, lastPlant:a.lastPlant, days, hasToday, isInactive, lastDate, daysSinceLast};
       }).sort((x,y) => y.dayEarn - x.dayEarn);
       // 汇总行的最新一日收益同样按「今天」口径
