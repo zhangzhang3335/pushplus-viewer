@@ -285,6 +285,63 @@
 </style>
 </head>
 <body>
+<style>
+  #licenseGate{position:fixed;inset:0;z-index:9999;background:radial-gradient(1200px 600px at 50% 30%,#16213a,#0b1220);display:flex;align-items:center;justify-content:center}
+  #licenseGate.hide{display:none}
+  .lic-box{width:min(420px,92vw);background:#141c2e;border:1px solid rgba(120,150,200,.25);border-radius:14px;padding:32px 28px;box-shadow:0 12px 50px rgba(0,0,0,.5);text-align:center}
+  .lic-box h2{margin:0 0 6px;font-size:20px;color:#ffd479}
+  .lic-box .lic-sub{color:#8fa3c7;font-size:13px;margin-bottom:20px}
+  .lic-box input{width:100%;box-sizing:border-box;background:#0d1524;border:1px solid rgba(120,150,200,.35);border-radius:8px;color:#e8eefc;font-size:16px;letter-spacing:2px;text-align:center;padding:12px;outline:none}
+  .lic-box input:focus{border-color:#6bb2ff}
+  .lic-box .lic-btn{margin-top:14px;width:100%;padding:11px;border:0;border-radius:8px;background:linear-gradient(180deg,#3b82f6,#2563eb);color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+  .lic-box .lic-btn:hover{filter:brightness(1.1)}
+  .lic-box .lic-err{margin-top:10px;color:#ff8f8f;font-size:13px;min-height:18px}
+</style>
+<div id="licenseGate">
+  <div class="lic-box">
+    <h2>梦幻种树收益统计</h2>
+    <div class="lic-sub">请输入激活码后使用</div>
+    <input id="licInput" maxlength="19" placeholder="PPV-XXXX-XXXX-XXXX" autocomplete="off">
+    <button id="licBtn" class="lic-btn">激 活</button>
+    <div id="licErr" class="lic-err"></div>
+  </div>
+</div>
+<script>
+(function(){
+  /* ---------- 激活码验证（纯前端，哈希比对） ---------- */
+  const LIC_HASHES = [
+    '84dd398931c56662ee3295291e062f9285f0f04ba20f9d3cd5d103a76d43270e',
+    'e1a23c8c473b701ff16aa04e5e04bdde7cb8481365ee233d5731ae4c2054e8c5',
+    'a48be2fcce9045394260ab683fff45c1583ed877fe1a4fb71e70b4e2e8722480',
+    'c111d9a3ee9b6b3924d9d1a6afdf0a134cbc9523877e2e9a57154da8f1acf34a',
+    'c1107abad3cec98ff1f32e3b882efca4104e7671225a4a9950c2a50c9f1c946e'
+  ];
+  async function sha256(str){
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+  function showMain(){ document.getElementById('licenseGate').classList.add('hide'); }
+  function hideMain(){ document.getElementById('licenseGate').classList.remove('hide'); }
+  async function tryActivate(){
+    const code = (document.getElementById('licInput').value || '').trim().toUpperCase();
+    const err = document.getElementById('licErr');
+    if(!/^PPV-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)){ err.textContent = '格式错误，示例：PPV-XXXX-XXXX-XXXX'; return; }
+    const h = await sha256(code);
+    if(LIC_HASHES.includes(h)){
+      localStorage.setItem('pp_license', code);
+      err.textContent = '';
+      showMain();
+    }else{
+      err.textContent = '激活码错误，请检查后重试';
+    }
+  }
+  document.getElementById('licBtn').onclick = tryActivate;
+  document.getElementById('licInput').addEventListener('keydown', e => { if(e.key === 'Enter') tryActivate(); });
+  // 启动检查：已激活则直接放行
+  const saved = localStorage.getItem('pp_license');
+  if(saved){ sha256(saved.toUpperCase()).then(h => { if(LIC_HASHES.includes(h)) showMain(); }); }
+})();
+</script>
 
 <header>
   <div class="brand">
