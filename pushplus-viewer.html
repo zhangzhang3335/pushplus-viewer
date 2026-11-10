@@ -1697,8 +1697,11 @@
     $('dProg').style.width = '0';
     try{
       const cap = scope === 'all' ? state.total : Number(scope);
-      // 多取一条（实际会多取到一页）作为「范围之前」的基准消息，让范围内最早一条能算出真实盈亏
-      const all = await fetchAllMessages(infoEl, scope, cap < state.total ? cap + 1 : cap);
+      // 多取 2 页（100 条）作为「范围之前」的基准消息
+      // 只多取 1 条时，新增账号在基准区没有更早消息 → 首条盈亏会被算成 0
+      const ps = 50;   // 接口页大小固定 50
+      const baseExtra = ps * 2;
+      const all = await fetchAllMessages(infoEl, scope, cap < state.total ? cap + baseExtra : cap);
       const baseCodes = new Set(all.slice(cap).map(m => m.shortCode));   // 仅作基准，不参与统计
       const msgs = all.filter(m => baseCodes.has(m.shortCode) || !isFilteredMsg(m));
       if(!all.length) throw new Error('没有可统计的消息');
@@ -1788,7 +1791,9 @@
         d.count++;
         if(r.plant != null) d.plant = Math.max(d.plant, r.plant);
         d.earn += r.earn || 0;   // 先按推送内容收益暂存（下面会用累计收益增量覆盖）
-        d.msgs.push({t: t.slice(11,19) || t, earn: 0, cum: r.cum, plant: r.plant});
+        // 保存正文里的单棵收益（perK*10000）作 fallback——当 cum 增量不可用时（没有上一笔）用它
+        const earnFallback = (r.perK != null) ? r.perK * 10000 : (r.earn != null ? r.earn : null);
+        d.msgs.push({t: t.slice(11,19) || t, earn: 0, cum: r.cum, plant: r.plant, earnFallback});
         if(r.cum != null && t >= d.lastTime){ d.lastTime = t; d.lastCum = r.cum; if(r.plant != null) d.lastPlant = r.plant; }
         a.days.set(date, d);
         accts.set(name, a);
@@ -1813,7 +1818,14 @@
         let prevCum = bb ? bb.cum : null, prevPlant = bb && bb.plant != null ? bb.plant : null;
         days.forEach(d => d.msgs.sort((x,y) => x.t < y.t ? -1 : (x.t > y.t ? 1 : 0)));
         days.forEach(d => d.msgs.forEach(m => {
-          m.earn = (m.cum != null && prevCum != null) ? (m.cum - prevCum) : 0;
+          // 优先用 cum 增量（有上一笔时最准确）；没有上一笔时用正文里的单棵收益作 fallback
+          if(m.cum != null && prevCum != null) {
+            m.earn = m.cum - prevCum;
+          } else if(m.earnFallback != null) {
+            m.earn = m.earnFallback;
+          } else {
+            m.earn = 0;
+          }
           m.grow = (m.plant != null && prevPlant != null) ? Math.max(0, m.plant - prevPlant) : 0;
           if(m.cum != null) prevCum = m.cum;
           if(m.plant != null) prevPlant = m.plant;
